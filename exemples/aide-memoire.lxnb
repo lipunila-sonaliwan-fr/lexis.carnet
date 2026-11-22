@@ -1,0 +1,27 @@
+{
+  "format": "lexis-carnet",
+  "version": 1,
+  "metadonnees": {
+    "titre": "Aide-mémoire",
+    "cree": "2026-11-18 21:00:00",
+    "modifie": "2026-11-18 22:22:25"
+  },
+  "cellules": [
+    {
+      "genre": "markdown",
+      "source": "# Aide-mémoire de Carnet Lexis+\n\n## Cellules\n\n| Genre | Contenu | Exécution |\n| --- | --- | --- |\n| Code | Lexis+ | interpréteur du noyau |\n| SQL | instructions séparées par `;` | base DuckDB du noyau |\n| Texte | Markdown | rendu (Maj+Entrée) |\n\n## Clavier\n\n- **Maj+Entrée** : exécuter et passer à la cellule suivante (crée une cellule à la fin)\n- **Ctrl+Entrée** : exécuter la cellule\n- **Ctrl+S / Ctrl+O / Ctrl+N** : enregistrer, ouvrir, nouveau\n- **Double-clic** sur un texte rendu : le modifier\n\n## Afficher des résultats\n\n| Appel | Résultat |\n| --- | --- |\n| `? a, b` | texte |\n| `afficher(x)` | valeur ; tableau pour une liste de fiches |\n| `afficher_table(lignes, [colonnes])` | grille |\n| `afficher_graphe(genre, categories, series, [titre])` | graphe |\n| `afficher_graphe_table(lignes, categorie, valeurs, [genre], [titre])` | graphe d'une requête |\n| `afficher_md(texte)` | Markdown |\n| `afficher_sql(requete, [paramètres…])` | grille du résultat |\n\n## Noyau\n\n- Les variables **non déclarées** sont globales et restent d'une cellule à l'autre ;\n  `locale x` limite une variable à sa cellule.\n- Les `procedure` / `fonction` écrites dans une cellule sont connues de toutes les autres.\n- **■ Interrompre** arrête une boucle sans fin : le noyau redémarre et les variables sont effacées.\n- `saisir(\"Question ?\")` ouvre une boîte de saisie.\n- Le dossier courant du noyau est celui du carnet : les fichiers de données s'y lisent par leur nom."
+    },
+    {
+      "genre": "code",
+      "source": "? \"Bonjour depuis le noyau :\", date(), heure()",
+      "compteur": 1,
+      "duree": 0.001,
+      "sorties": [
+        {
+          "genre": "texte",
+          "texte": "Bonjour depuis le noyau : 2026-11-18 22:22:24"
+        }
+      ]
+    }
+  ]
+}

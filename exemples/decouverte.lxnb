@@ -1,0 +1,174 @@
+{
+  "format": "lexis-carnet",
+  "version": 1,
+  "metadonnees": {
+    "titre": "Découverte de Carnet Lexis+",
+    "cree": "2026-11-18 21:00:00",
+    "modifie": "2026-11-18 22:22:24"
+  },
+  "cellules": [
+    {
+      "genre": "markdown",
+      "source": "# Découverte de Carnet Lexis+\n\nUn **carnet** mélange du *texte* (Markdown), du **code Lexis+** et du **SQL** ; les résultats\ns'affichent sous chaque cellule et sont enregistrés avec le carnet.\n\n- **Maj+Entrée** : exécuter la cellule et passer à la suivante\n- **Ctrl+Entrée** : exécuter sans changer de cellule\n- **Double-clic** sur un texte : le modifier ; **Maj+Entrée** : revenir au rendu\n\n> Les variables créées dans une cellule restent disponibles dans les suivantes,\n> jusqu'au redémarrage du noyau (↻)."
+    },
+    {
+      "genre": "markdown",
+      "source": "## 1. Calculer et afficher"
+    },
+    {
+      "genre": "code",
+      "source": "&& les variables non déclarées restent d'une cellule à l'autre\ntaux = 0.2\nprix = {12.5, 40, 7.9, 120}\ntotal = 0\npour chaque p dans prix\n  total += p\nsuivant\n? \"Total HT :\", total\n? \"Total TTC :\", arrondi(total * (1 + taux), 2)\nafficher(prix)",
+      "compteur": 1,
+      "duree": 0.001,
+      "sorties": [
+        {
+          "genre": "texte",
+          "texte": "Total HT : 180.4\nTotal TTC : 216.48"
+        },
+        {
+          "genre": "valeur",
+          "texte": "{12.5, 40, 7.9, 120}"
+        }
+      ]
+    },
+    {
+      "genre": "code",
+      "source": "&& les cellules suivantes voient « total » et « taux »\nafficher_md(\"Le total TTC vaut **\" + arrondi(total * (1 + taux), 2) + \" €**.\")",
+      "compteur": 2,
+      "duree": 0.001,
+      "sorties": [
+        {
+          "genre": "markdown",
+          "texte": "Le total TTC vaut **216.48 €**."
+        }
+      ]
+    },
+    {
+      "genre": "markdown",
+      "source": "## 2. Des tableaux\n\n`afficher_table(lignes)` affiche une liste de fiches (ou de listes) dans une grille ;\n`afficher(x)` choisit seul le bon affichage."
+    },
+    {
+      "genre": "code",
+      "source": "ventes = {}\nmois = {\"janv.\", \"févr.\", \"mars\", \"avr.\", \"mai\", \"juin\"}\npour i = 1 a 6\n  inserer {mois = mois[i], nord = 100 + i * 23 + (i % 2) * 40, sud = 80 + i * 31} dans ventes\nsuivant\nafficher_table(ventes, {\"mois\", \"nord\", \"sud\"})",
+      "compteur": 3,
+      "duree": 0.001,
+      "sorties": [
+        {
+          "genre": "table",
+          "colonnes": ["mois", "nord", "sud"],
+          "lignes": [
+            ["janv.", 163, 111],
+            ["févr.", 146, 142],
+            ["mars", 209, 173],
+            ["avr.", 192, 204],
+            ["mai", 255, 235],
+            ["juin", 238, 266]
+          ],
+          "total": 6
+        }
+      ]
+    },
+    {
+      "genre": "markdown",
+      "source": "## 3. Des graphes\n\n`afficher_graphe(genre, catégories, séries, [titre])` — genres : `colonnes`, `lignes`, `aires`, `secteurs`."
+    },
+    {
+      "genre": "code",
+      "source": "nord = {}\nsud = {}\npour chaque v dans ventes\n  inserer v.nord dans nord\n  inserer v.sud dans sud\nsuivant\nafficher_graphe(\"colonnes\", mois, {{nom = \"Nord\", valeurs = nord}, {nom = \"Sud\", valeurs = sud}}, \"Ventes par région\")\nafficher_graphe(\"secteurs\", {\"Nord\", \"Sud\"}, {total_liste(nord), total_liste(sud)}, \"Part de chaque région\")\n\nfonction TOTAL_LISTE(l)\n  locale s = 0\n  pour chaque x dans l\n    s += x\n  suivant\nretourner s",
+      "compteur": 4,
+      "duree": 0.001,
+      "sorties": [
+        {
+          "genre": "graphe",
+          "forme": "colonnes",
+          "titre": "Ventes par région",
+          "categories": ["janv.", "févr.", "mars", "avr.", "mai", "juin"],
+          "series": [
+            {
+              "nom": "Nord",
+              "valeurs": [163, 146, 209, 192, 255, 238]
+            },
+            {
+              "nom": "Sud",
+              "valeurs": [111, 142, 173, 204, 235, 266]
+            }
+          ]
+        },
+        {
+          "genre": "graphe",
+          "forme": "secteurs",
+          "titre": "Part de chaque région",
+          "categories": ["Nord", "Sud"],
+          "series": [
+            {
+              "nom": "",
+              "valeurs": [1203, 1131]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "genre": "markdown",
+      "source": "## 4. SQL avec DuckDB\n\nUne cellule **SQL** s'exécute dans la base DuckDB du noyau (en mémoire) ; le résultat\nde la dernière instruction est affiché. Depuis le code : `requete(...)`, `afficher_sql(...)`."
+    },
+    {
+      "genre": "sql",
+      "source": "create table produits as\n  select * from (values ('Stylo', 'Bureau', 1.5, 320), ('Cahier', 'Bureau', 3.2, 150),\n                        ('Lampe', 'Maison', 24.9, 40), ('Tasse', 'Maison', 6.5, 95),\n                        ('Câble', 'Info', 9.9, 210), ('Souris', 'Info', 19.0, 75))\n  t(libelle, rayon, prix, quantite);\nselect rayon, count(*) as articles, sum(prix * quantite) as chiffre\nfrom produits group by rayon order by chiffre desc;",
+      "compteur": 5,
+      "duree": 0.021,
+      "sorties": [
+        {
+          "genre": "table",
+          "colonnes": ["RAYON", "ARTICLES", "CHIFFRE"],
+          "lignes": [
+            ["Info", 2, 3504],
+            ["Maison", 2, 1613.5],
+            ["Bureau", 2, 960]
+          ],
+          "total": 3
+        }
+      ]
+    },
+    {
+      "genre": "code",
+      "source": "r = requete(\"select libelle, prix * quantite as chiffre from produits order by chiffre desc\")\nafficher_graphe_table(r, \"libelle\", \"chiffre\", \"lignes\", \"Chiffre par article\")",
+      "compteur": 6,
+      "duree": 0.006,
+      "sorties": [
+        {
+          "genre": "graphe",
+          "forme": "lignes",
+          "titre": "Chiffre par article",
+          "categories": ["Câble", "Souris", "Lampe", "Tasse", "Stylo", "Cahier"],
+          "series": [
+            {
+              "nom": "chiffre",
+              "valeurs": [2079, 1425, 996, 617.5, 480, 480]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "genre": "markdown",
+      "source": "## 5. Les erreurs\n\nUne erreur s'affiche sous la cellule, avec **la ligne de la cellule** et la pile d'appels ;\nla ligne fautive est soulignée dans l'éditeur."
+    },
+    {
+      "genre": "code",
+      "source": "fonction RATIO(a, b)\nretourner a / b\n\n? RATIO(10, 4)\n? RATIO(1, 0)",
+      "compteur": 7,
+      "sorties": [
+        {
+          "genre": "texte",
+          "texte": "2.5"
+        },
+        {
+          "genre": "erreur",
+          "texte": "ligne 2: division par zéro\npile d'appels :\n  ligne 2 dans RATIO\n  ligne 5",
+          "ligne": 2
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,244 @@
+&& Carnet Lexis+ : noyau d'exécution (copié en noyau.prg dans un dossier temporaire).
+&& Le carnet l'exécute avec lexis.executer ; il attend une commande par saisie :
+&&   X|procedures.prg|cellule.prg|NB_CELLULE_n|ident   exécute une cellule
+&&   §dossier|chemin                                   change le dossier courant
+&&   §quitter                                          termine le noyau
+&& Chaque cellule est une procédure chargée par lexis.charger : les variables non
+&& déclarées sont globales et restent d'une cellule à l'autre.
+&& Les sorties enrichies sont des lignes « car(30) NB:sortie:<json> ».
+NB_FIN = faux
+NB_MAX_LIGNES = 1000
+essayer
+  ouvrirbase(":memoire:")
+capturer e
+finessayer
+tantque non NB_FIN
+  ? car(30) + "NB:pret"
+  NB_CMD = saisir("")
+  faire cas
+  cas NB_CMD = nul ou NB_CMD = "§quitter"
+    NB_FIN = vrai
+  cas commencepar(NB_CMD, "§dossier|")
+    essayer
+      fichier.changer(souschaine(NB_CMD, 10))
+    capturer e
+    finessayer
+  cas commencepar(NB_CMD, "X|")
+    NB_EXECUTER(decouper(NB_CMD, "|"))
+  fincas
+fintantque
+
+procedure NB_EXECUTER(p)
+  ? car(30) + "NB:debut:" + p[5]
+  locale t0 = systeme.horloge()
+  essayer
+    si p[2] <> ""
+      lexis.charger(p[2])
+    finsi
+    lexis.charger(p[3])
+    appeler(lexis.procedure(p[4]))
+    ? car(30) + "NB:fin:" + p[5] + ":ok:" + chaine(arrondi(systeme.horloge() - t0, 3))
+  capturer e
+    locale pile = pileerreur()
+    si pile = nul ou pile = ""
+      pile = chaine(e)
+    finsi
+    ? car(30) + "NB:fin:" + p[5] + ":erreur:" + json(pile)
+  finessayer
+retourner
+
+procedure NB_EMETTRE(t)
+  ? car(30) + "NB:sortie:" + json(t)
+retourner
+
+fonction NB_TEXTE(x, profondeur)
+  si profondeur = nul
+    profondeur = 0
+  finsi
+  faire cas
+  cas x = nul
+    retourner "nul"
+  cas type(x) = "chaine"
+    si profondeur = 0
+      retourner x
+    finsi
+    retourner json(x)
+  cas type(x) = "logique"
+    retourner sisinon(x, "vrai", "faux")
+  cas type(x) <> "table"
+    retourner chaine(x)
+  fincas
+  si profondeur > 3
+    retourner "{…}"
+  finsi
+  locale morceaux = {}
+  locale n = 0
+  locale nl = taille(x)
+  pour i = 1 a nl
+    n += 1
+    si n > 50
+      inserer "…" dans morceaux
+      sortir
+    finsi
+    inserer NB_TEXTE(x[i], profondeur + 1) dans morceaux
+  suivant
+  pour chaque k, v dans x
+    si type(k) = "nombre" et k >= 1 et k <= nl et k = entier(k)
+      boucler
+    finsi
+    n += 1
+    si n > 50
+      inserer "…" dans morceaux
+      sortir
+    finsi
+    inserer minuscule(chaine(k)) + " = " + NB_TEXTE(v, profondeur + 1) dans morceaux
+  suivant
+retourner "{" + joindre(morceaux, ", ") + "}"
+
+fonction NB_CELLULE_VAL(v)
+  faire cas
+  cas v = nul
+    retourner ""
+  cas type(v) = "nombre" ou type(v) = "chaine"
+    retourner v
+  cas type(v) = "logique"
+    retourner sisinon(v, "vrai", "faux")
+  fincas
+retourner NB_TEXTE(v, 1)
+
+&& afficher(x) : valeur, liste de fiches (tableau) ou table quelconque
+procedure AFFICHER(x)
+  si type(x) = "table" et taille(x) > 0 et type(x[1]) = "table"
+    AFFICHER_TABLE(x)
+    retourner
+  finsi
+  NB_EMETTRE({genre = "valeur", texte = NB_TEXTE(x, 0)})
+retourner
+
+&& afficher_table(lignes, [colonnes]) : lignes = liste de fiches ou de listes
+procedure AFFICHER_TABLE(lignes, colonnes)
+  si lignes = nul
+    lignes = {}
+  finsi
+  locale noms = {}
+  locale fiches = faux
+  si taille(lignes) > 0 et type(lignes[1]) = "table" et taille(lignes[1]) = 0
+    fiches = vrai
+  finsi
+  si colonnes <> nul
+    pour chaque c dans colonnes
+      inserer chaine(c) dans noms
+    suivant
+  sinonsi fiches
+    pour chaque k, v dans lignes[1]
+      inserer chaine(k) dans noms
+    suivant
+  sinonsi taille(lignes) > 0 et type(lignes[1]) = "table"
+    pour i = 1 a taille(lignes[1])
+      inserer "C" + i dans noms
+    suivant
+  sinon
+    inserer "VALEUR" dans noms
+  finsi
+  locale sortie = {}
+  locale n = 0
+  pour chaque r dans lignes
+    n += 1
+    si n > NB_MAX_LIGNES
+      sortir
+    finsi
+    locale ligne = {}
+    pour i = 1 a taille(noms)
+      locale v = nul
+      si type(r) <> "table"
+        si i = 1
+          v = r
+        finsi
+      sinonsi fiches
+        v = r[majuscule(noms[i])]
+      sinon
+        v = r[i]
+      finsi
+      inserer NB_CELLULE_VAL(v) dans ligne
+    suivant
+    inserer ligne dans sortie
+  suivant
+  NB_EMETTRE({genre = "table", colonnes = noms, lignes = sortie, total = taille(lignes)})
+retourner
+
+&& afficher_graphe(genre, categories, series, [titre])
+&&   genre : colonnes, lignes, aires, secteurs ; series : liste de nombres,
+&&   ou liste de {nom = "…", valeurs = {…}}
+procedure AFFICHER_GRAPHE(genre, categories, series, titre)
+  locale ss = {}
+  si series = nul
+    series = {}
+  finsi
+  si taille(series) > 0 et type(series[1]) <> "table"
+    series = {{nom = "", valeurs = series}}
+  finsi
+  locale k = 0
+  pour chaque s dans series
+    k += 1
+    si aclef(s, "VALEURS")
+      inserer {nom = chaine(sisinon(s.nom = nul, "Série " + k, s.nom)), valeurs = s.valeurs} dans ss
+    sinon
+      inserer {nom = "Série " + k, valeurs = s} dans ss
+    finsi
+  suivant
+  locale cats = {}
+  pour chaque c dans categories
+    inserer chaine(c) dans cats
+  suivant
+  NB_EMETTRE({genre = "graphe", forme = chaine(sisinon(genre = nul, "colonnes", genre)), ;
+              titre = chaine(sisinon(titre = nul, "", titre)), categories = cats, series = ss})
+retourner
+
+&& afficher_graphe_table(lignes, categorie, valeurs, [genre], [titre]) : graphe tiré d'une
+&& requête ; valeurs : un nom de colonne ou une liste de noms
+procedure AFFICHER_GRAPHE_TABLE(lignes, categorie, valeurs, genre, titre)
+  si type(valeurs) <> "table"
+    valeurs = {valeurs}
+  finsi
+  locale cats = {}
+  pour chaque r dans lignes
+    inserer r[majuscule(categorie)] dans cats
+  suivant
+  locale ss = {}
+  pour chaque nomv dans valeurs
+    locale vs = {}
+    pour chaque r dans lignes
+      locale v = r[majuscule(nomv)]
+      inserer sisinon(v = nul, 0, v) dans vs
+    suivant
+    inserer {nom = nomv, valeurs = vs} dans ss
+  suivant
+  AFFICHER_GRAPHE(genre, cats, ss, titre)
+retourner
+
+&& afficher_md(texte) : texte Markdown rendu dans les sorties
+procedure AFFICHER_MD(t)
+  NB_EMETTRE({genre = "markdown", texte = chaine(t)})
+retourner
+
+&& afficher_sql(requete, [paramètres…]) : exécute une requête DuckDB et affiche le résultat
+procedure AFFICHER_SQL(s, a1, a2, a3, a4)
+  locale r = nul
+  faire cas
+  cas a1 = nul
+    r = requete(s)
+  cas a2 = nul
+    r = requete(s, a1)
+  cas a3 = nul
+    r = requete(s, a1, a2)
+  cas a4 = nul
+    r = requete(s, a1, a2, a3)
+  autrement
+    r = requete(s, a1, a2, a3, a4)
+  fincas
+  si r = nul ou taille(r) = 0
+    NB_EMETTRE({genre = "valeur", texte = "(aucune ligne)"})
+  sinon
+    AFFICHER_TABLE(r)
+  finsi
+retourner
