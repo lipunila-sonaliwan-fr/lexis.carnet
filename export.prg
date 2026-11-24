@@ -285,6 +285,9 @@ blockquote { margin: 0; padding: 4px 14px; border-left: 3px solid var(--accent);
 a.anchor { margin-left: .3em; color: #9ca3af; text-decoration: none; font-weight: normal; opacity: 0; }
 h1:hover a.anchor, h2:hover a.anchor, h3:hover a.anchor, h4:hover a.anchor { opacity: 1; }
 footer { margin-top: 40px; color: var(--doux); font-size: .8em; text-align: center; }
+details.masquee { margin: 18px 0; border: 1px dashed #d1d5db; border-radius: 8px; padding: 6px 12px; background: var(--carte); }
+details.masquee > summary { cursor: pointer; color: var(--doux); font-size: .9em; }
+details.masquee[open] > summary { margin-bottom: 6px; }
 ]]
 
 fonction EST_NOMBRE_TEXTE(v)
@@ -337,13 +340,20 @@ fonction HTML_CARNET()
   inserer "<meta name=" + car(34) + "viewport" + car(34) + " content=" + car(34) + "width=device-width, initial-scale=1" + car(34) + ">" dans o
   inserer "<title>" + html(TITRE_CARNET()) + "</title><style>" + CSS_EXPORT() + "</style></head><body><main>" dans o
   && le titre du carnet n'est répété que si la première cellule n'en a pas
+  locale cellules = CELLULES_EXPORT()
   locale entete_h1 = "<h1>" + html(TITRE_CARNET()) + "</h1>"
-  si taille(carnet.cellules) > 0 et carnet.cellules[1].genre = "markdown" et commencepar(rognerg(carnet.cellules[1].source), "# ")
+  si taille(cellules) > 0 et cellules[1].genre = "markdown" et commencepar(rognerg(cellules[1].source), "# ")
     entete_h1 = ""
   finsi
   inserer "<header class=" + car(34) + "carnet" + car(34) + ">" + entete_h1 + "<p>Carnet Lexis+ · " + ;
           html(date()) + "</p></header>" dans o
-  pour chaque c dans carnet.cellules
+  pour chaque c dans cellules
+    && cellule masquée à l'écran : repliée dans la page (un clic l'ouvre)
+    si c.masquee
+      inserer "<details class=" + car(34) + "masquee" + car(34) + "><summary>" + ;
+              html(sisinon(c.genre = "markdown", "Texte", sisinon(c.genre = "sql", "SQL", "Code"))) + " masqué : " + ;
+              html(APERCU_CELLULE(c, 90)) + "</summary>" dans o
+    finsi
     si c.genre = "markdown"
       inserer "<section class=" + car(34) + "md" + car(34) + ">" + publication.html(c.source) + "</section>" dans o
     sinon
@@ -361,6 +371,9 @@ fonction HTML_CARNET()
         inserer "</div>" dans o
       finsi
       inserer "</section>" dans o
+    finsi
+    si c.masquee
+      inserer "</details>" dans o
     finsi
   suivant
   inserer "<footer>Exporté de Carnet Lexis+ le " + html(maintenant()) + "</footer>" dans o
@@ -422,11 +435,12 @@ fonction MARKDOWN_CARNET(dossier_fig, prefixe)
   SYNC_SOURCES()
   locale o = {}
   locale fig = 0
-  si non (taille(carnet.cellules) > 0 et carnet.cellules[1].genre = "markdown" et ;
-          commencepar(rognerg(carnet.cellules[1].source), "# "))
+  locale cellules = CELLULES_EXPORT()
+  si non (taille(cellules) > 0 et cellules[1].genre = "markdown" et ;
+          commencepar(rognerg(cellules[1].source), "# "))
     inserer "# " + TITRE_CARNET() + car(10) dans o
   finsi
-  pour chaque c dans carnet.cellules
+  pour chaque c dans cellules
     si c.genre = "markdown"
       inserer c.source + car(10) dans o
     sinon
@@ -593,7 +607,9 @@ fonction PROGRAMME_CARNET()
   locale k = 0
   pour chaque c dans carnet.cellules
     k += 1
-    si c.genre = "markdown"
+    si c.exporter = faux
+      inserer "&& ---- cellule " + k + " : exclue de l'export" dans corps
+    sinonsi c.genre = "markdown"
       pour chaque l dans decouper(c.source, car(10))
         inserer rognerd("&& " + l) dans corps
       suivant

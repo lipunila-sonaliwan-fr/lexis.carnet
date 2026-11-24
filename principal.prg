@@ -16,7 +16,7 @@
 &&   ressources/noyau.lxk  programme du noyau (copié dans un dossier temporaire)
 ui = paquet("interface")
 
-APP_NOM = "Carnet Lexis+"
+APP_NOM = "Carnet Lexis+ 1.0.1"
 reglages = LIRE_REGLAGES()
 carnet = nul                && document courant {titre, cellules, ...}
 chemin_carnet = ""          && fichier .lxnb ("" : jamais enregistré)
@@ -207,7 +207,9 @@ procedure MARQUER_MODIFIE
   finsi
 retourner
 
-&& ---------------------------------------------------------------- menus
+&&
+&& menus
+&&
 
 fonction MENUS()
 retourner { ;
@@ -219,7 +221,9 @@ retourner { ;
                "Insérer du code dessus", "-", ;
                "Monter", "Descendre", "Dupliquer", "Supprimer", "-", ;
                "Changer en code Lexis+", "Changer en texte Markdown", "Changer en SQL", "-", ;
-               "Modifier le texte (cellule Markdown)", "Effacer les sorties de la cellule"}}, ;
+               "Modifier le texte (cellule Markdown)", "Effacer les sorties de la cellule", "-", ;
+               "Masquer / afficher la cellule", "Inclure / exclure des exports", ;
+               "Masquer toutes les cellules de code", "Afficher toutes les cellules"}}, ;
   {"Exécution", {"Exécuter la cellule (Ctrl+Entrée)", "Exécuter et passer à la suivante (Maj+Entrée)", ;
                  "Tout exécuter", "Exécuter les cellules au-dessus", "Exécuter à partir de la cellule", "-", ;
                  "Interrompre", "Redémarrer le noyau", "Redémarrer et tout exécuter", "-", ;
@@ -290,6 +294,14 @@ procedure MENU(ev)
     EDITER_MARKDOWN(cellule_choisie)
   cas choix = "Effacer les sorties de la cellule"
     EFFACER_SORTIES_CELLULE(cellule_choisie)
+  cas choix = "Masquer / afficher la cellule"
+    BASCULER_MASQUE(cellule_choisie)
+  cas choix = "Inclure / exclure des exports"
+    BASCULER_EXPORT(cellule_choisie)
+  cas choix = "Masquer toutes les cellules de code"
+    MASQUER_TOUT(vrai, "code")
+  cas choix = "Afficher toutes les cellules"
+    MASQUER_TOUT(faux, nul)
   cas commencepar(choix, "Exécuter la cellule")
     EXECUTER_CHOISIE(nul)
   cas commencepar(choix, "Exécuter et passer")
@@ -322,19 +334,22 @@ procedure MENU(ev)
   cas choix = "Aide-mémoire"
     OUVRIR_EXEMPLE("aide-memoire.lxnb")
   cas choix = "Raccourcis clavier"
-    ui.alerte("Maj+Entrée : exécuter la cellule et passer à la suivante\n" + ;
-              "Ctrl+Entrée : exécuter la cellule\n" + ;
-              "Maj+Entrée dans une cellule de texte : afficher le rendu Markdown\n" + ;
-              "Double-clic sur un texte rendu : le modifier\n" + ;
-              "Ctrl+S : enregistrer · Ctrl+O : ouvrir · Ctrl+N : nouveau\n" + ;
-              "Ctrl+Espace : complétion dans le code", "information", "Raccourcis clavier")
+    ui.alerte(
+      "\nCtrl.\n+Espace : complétion dans le code\n" +
+      "+Entrée : exécuter/afficher la cellule\n" +
+      "+N : nouveau\n+O : ouvrir\n+S : enregistrer\n" +
+      "\nMàj.\n+Entrée : exécuter/afficher et passer à la cellule nsuivante\n" +
+      "\nDouble-clic\nsur un texte mis en forme : modifier son markdown"
+    )
   cas choix = "À propos"
-    ui.alerte("\n" + APP_NOM + " interactifs avec :\n" + ;
-              "→ Code Lexis+\n→ SQL DuckDB\n→ Texte Markdown\n\n" + ;
-              "Résultats immédiats, enregistrés avec le carnet, sous forme de :\n→ Graphes\n→ Tableaux\n→ Texte\n\n" + ;
-              "Tous droits réservés 2026 - Jean-Marc QUÉRÉ\n" +
-              "⛶ https://sonaliwan.fr  ✉ metalab (at) sonaliwan.fr\n" +
-              "SIRET 13033319800013", "information", "À propos")              
+    ui.alerte(
+      "\n" + APP_NOM + " interactifs avec :\n" + ;
+      "→ Code Lexis+\n→ SQL DuckDB\n→ Texte Markdown\n\n" + ;
+      "Résultats immédiats, enregistrés avec le carnet, sous forme de :\n→ Graphes\n→ Tableaux\n→ Textes\n\n" + ;
+      "Tous droits réservés 2026 - Jean-Marc QUÉRÉ\n" +
+      "⛶ https://sonaliwan.fr  ✉ metalab (at) sonaliwan.fr\n" +
+      "SIRET 13033319800013", "information", "À propos"
+    )              
   fincas
 retourner
 
@@ -353,7 +368,9 @@ procedure TOUCHE(ev)
   fincas
 retourner
 
-&& ---------------------------------------------------------------- fichier
+&&
+&& fichier
+&&
 
 procedure NOUVEAU(ev)
   si non CONFIRMER_ABANDON()
@@ -538,7 +555,9 @@ procedure TAILLE_POLICE
   ECRIRE_REGLAGES()
 retourner
 
-&& ---------------------------------------------------------------- réglages
+&&
+&& réglages
+&&
 
 fonction FICHIER_REGLAGES()
 retourner fichier.joindre(fichier.dossierperso(), ".carnet_lexis.json")

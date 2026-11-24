@@ -5,7 +5,9 @@
 &&   {"format": "lexis-carnet", "version": 1,
 &&    "metadonnees": {"titre": "...", "cree": "AAAA-MM-JJ HH:MM:SS", "modifie": "..."},
 &&    "cellules": [{"genre": "code" | "markdown" | "sql", "source": "...",
-&&                  "compteur": n, "duree": s, "sorties": [...]}]}
+&&                  "compteur": n, "duree": s, "sorties": [...],
+&&                  "masquee": true,      (facultatif : cellule repliée à l'écran)
+&&                  "export": false}]}    (facultatif : cellule exclue des exports)
 && Sorties : {"genre": "texte" | "valeur" | "markdown", "texte": "..."}
 &&           {"genre": "table", "colonnes": [...], "lignes": [[...]], "total": n}
 &&           {"genre": "graphe", "forme": "colonnes|lignes|aires|secteurs", "titre": "...",
@@ -19,7 +21,7 @@ retourner {format = "lexis-carnet", version = 1, ;
 
 fonction NOUVELLE_CELLULE(genre, src)
   locale c = {id = prochain_id, genre = genre, source = sisinon(src = nul, "", src), ;
-              compteur = 0, duree = nul, sorties = {}}
+              compteur = 0, duree = nul, sorties = {}, masquee = faux, exporter = vrai}
   prochain_id += 1
 retourner c
 
@@ -90,6 +92,8 @@ fonction LIRE_CARNET(p)
     locale cel = NOUVELLE_CELLULE(genre, SOURCE_TEXTE(bc.source))
     cel.compteur = sisinon(bc.compteur = nul, 0, bc.compteur)
     cel.duree = bc.duree
+    cel.masquee = (bc.masquee = vrai)
+    cel.exporter = (bc.export <> faux)
     si type(bc.sorties) = "table"
       pour chaque s dans bc.sorties
         inserer s dans cel.sorties
@@ -117,6 +121,12 @@ procedure ECRIRE_CARNET(p)
   locale cs = {}
   pour chaque c dans carnet.cellules
     locale x = {genre = c.genre, source = c.source}
+    si c.masquee
+      x.masquee = vrai
+    finsi
+    si non c.exporter
+      x.export = faux
+    finsi
     si c.genre <> "markdown"
       x.compteur = sisinon(c.compteur = nul, 0, c.compteur)
       si c.duree <> nul
@@ -174,3 +184,26 @@ fonction ENCODER_JSON(v, retrait)
     inserer json(minuscule(chaine(k))) + ": " + ENCODER_JSON(x, suite) dans champs
   suivant
 retourner "{" + car(10) + suite + joindre(champs, "," + car(10) + suite) + car(10) + retrait + "}"
+
+&& cellules incluses dans les exports (case « Export » du bandeau)
+fonction CELLULES_EXPORT()
+  locale l = {}
+  pour chaque c dans carnet.cellules
+    si c.exporter <> faux
+      inserer c dans l
+    finsi
+  suivant
+retourner l
+
+&& première ligne non vide d'une cellule (aperçu d'une cellule masquée)
+fonction APERCU_CELLULE(c, n)
+  pour chaque l dans decouper(chaine(c.source), car(10))
+    locale t = rogner(l)
+    si t <> ""
+      si longueur(t) > n
+        t = gauche(t, n - 1) + "…"
+      finsi
+      retourner t
+    finsi
+  suivant
+retourner "(vide)"

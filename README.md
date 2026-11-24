@@ -44,9 +44,16 @@ Le menu **Fichier › Ouvrir le carnet de découverte** présente toutes les pos
 | Arrêter une boucle sans fin | **■ Interrompre** : le noyau redémarre, ses variables sont effacées |
 | Repartir de zéro | **↻ Redémarrer** (ou *Exécution › Redémarrer et tout exécuter*) |
 | Enregistrer / ouvrir / nouveau | **Ctrl+S**, **Ctrl+O**, **Ctrl+N** |
+| Masquer / afficher une cellule | **▾ / ▸** au début de l'en-tête (ou *Cellule › Masquer / afficher la cellule*) |
+| Inclure ou exclure une cellule des exports | case **Export** de l'en-tête (ou *Cellule › Inclure / exclure des exports*) |
 
 L'en-tête d'une cellule de code montre son numéro d'exécution `[n]` (`[*]` : en attente ou en
 cours) et sa durée.
+
+Une cellule **masquée** (▸) ne montre plus que son en-tête, avec sa première ligne en aperçu ;
+elle s'exécute normalement et ses sorties sont conservées. *Cellule › Masquer toutes les cellules
+de code* replie tout le code (les textes restent lisibles) ; *Afficher toutes les cellules* les
+déplie. L'état masqué est enregistré avec le carnet.
 
 ## Écrire du code
 
@@ -86,6 +93,10 @@ s'affiche avec la ligne de la cellule et la pile d'appels traduite (« ligne 2 d
 - **programme `.prg`** : le code des cellules dans l'ordre, les textes en commentaires, les
   procédures à la fin et des versions console de `afficher…` : le carnet devient un programme.
 
+Seules les cellules dont la case **Export** est cochée sont exportées (dans le `.prg`, une
+cellule exclue est remplacée par un commentaire). Dans la page HTML, une cellule masquée est
+repliée : un clic sur son aperçu l'ouvre.
+
 ## En ligne de commande (traitement par lots)
 
 ```
@@ -109,14 +120,16 @@ JSON UTF-8, lisible et versionnable :
   "cellules": [
     {"genre": "markdown", "source": "# Titre"},
     {"genre": "code", "source": "? 1 + 1", "compteur": 1, "duree": 0.001,
-     "sorties": [{"genre": "texte", "texte": "2"}]}
+     "sorties": [{"genre": "texte", "texte": "2"}]},
+    {"genre": "code", "source": "x = 1", "masquee": true, "export": false}
   ]
 }
 ```
 
 Sorties : `texte`, `valeur`, `markdown` (`texte`), `table` (`colonnes`, `lignes`, `total`),
 `graphe` (`forme`, `titre`, `categories`, `series` : `{nom, valeurs}`), `erreur` (`texte`, `ligne`).
-Une `source` peut aussi être une liste de lignes.
+Une `source` peut aussi être une liste de lignes. `masquee` (cellule repliée) et `export`
+(`false` : exclue des exports) sont facultatifs et ne sont écrits que s'ils diffèrent du défaut.
 
 ## Réglages
 

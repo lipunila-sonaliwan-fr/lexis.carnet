@@ -1,7 +1,7 @@
 && CC BY-NC-SA 4.0 - jean-marc "jihem" quere 2026
 && Carnet Lexis+ : cellules à l'écran.
 && Chaque cellule est une colonne du panneau défilant :
-&&   en-tête   [n] · genre · durée · boutons (▶ ▲ ▼ ⧉ + ✕)
+&&   en-tête   ▾/▸ (masquer) · [n] · genre · durée / aperçu · ☑ Export · boutons (▶ ▲ ▼ ⧉ + ✕)
 &&   éditeur   ui.editeur sans onglets, hauteur ajustée au texte (code, SQL, Markdown en édition)
 &&   rendu     ui.markdown ajusté (cellule de texte hors édition ; double-clic : modifier)
 &&   sorties   colonne des résultats (voir sorties.prg)
@@ -30,7 +30,9 @@ fonction COULEUR_ENTETE(choisie)
   finsi
 retourner sisinon(choisie, "#DBEAFE", "#EEF0F3")
 
-&& ---------------------------------------------------------------- construction
+&&
+&& construction
+&&
 
 procedure CONSTRUIRE_TOUT
   maj_ui = vrai
@@ -60,6 +62,7 @@ procedure CONSTRUIRE_CELLULE(c)
   u.entete.marge = 2
   u.entete.espacement = 2
   u.entete.fond = COULEUR_ENTETE(faux)
+  u.repli = BOUTON_CELLULE(u, "◎", "masquer", "Masquer / afficher la cellule")
   u.num = u.entete:ajouter(ui.etiquette(""))
   u.num.largeurfixe = 54
   u.num.couleur = "#60A5FA"
@@ -69,6 +72,11 @@ procedure CONSTRUIRE_CELLULE(c)
   u.info = u.entete:ajouter(ui.etiquette(""))
   u.info.poids = 1
   u.info.couleur = "#9CA3AF"
+  u.exp = u.entete:ajouter(ui.cases("§"))
+  u.exp.largeurfixe = 36
+  u.exp.infobulle = "Inclure la cellule dans les exports (HTML, Markdown, PDF, .prg)"
+  u.exp:cocher(1, c.exporter <> faux)
+  u.exp.surchangement = @EXPORT_CHANGE
   BOUTON_CELLULE(u, "▶", "executer", "Exécuter la cellule (Ctrl+Entrée)")
   BOUTON_CELLULE(u, "▲", "monter", "Monter")
   BOUTON_CELLULE(u, "▼", "descendre", "Descendre")
@@ -99,13 +107,13 @@ procedure CONSTRUIRE_CELLULE(c)
   maj_ui = etait
 retourner
 
-procedure BOUTON_CELLULE(u, libelle, action, aide)
+fonction BOUTON_CELLULE(u, libelle, action, aide)
   locale b = u.entete:ajouter(ui.bouton(libelle, {plat = vrai}))
   b.largeurfixe = 26
   b.infobulle = aide
   b.surclic = @CLIC_BOUTON_CELLULE
   inserer {ctl = b, id = u.id, action = action} dans BOUTONS
-retourner
+retourner b
 
 && cellule de texte : rendu Markdown, ou éditeur pendant la modification
 procedure APPLIQUER_MODE(c)
@@ -113,7 +121,12 @@ procedure APPLIQUER_MODE(c)
   si u = nul
     retourner
   finsi
-  si c.genre = "markdown" et non u.edition
+  && cellule masquée : seul le bandeau reste visible
+  u.sorties.visible = non c.masquee
+  si c.masquee
+    u.ed.visible = faux
+    u.md.visible = faux
+  sinonsi c.genre = "markdown" et non u.edition
     u.md.valeur = MD_RENDU(c)
     u.md.visible = vrai
     u.ed.visible = faux
@@ -155,8 +168,13 @@ procedure MAJ_ENTETE(c)
   sinonsi u.edition
     info = "Maj+Entrée : afficher le rendu"
   finsi
+  si c.masquee
+    info = sisinon(info = "", "", info + " · ") + APERCU_CELLULE(c, 70)
+  finsi
   u.num.libelle = n
   u.info.libelle = info
+  u.repli.libelle = sisinon(c.masquee, "◉", "◎")
+  u.repli.infobulle = sisinon(c.masquee, "Afficher la cellule", "Masquer la cellule")
 retourner
 
 fonction DUREE_TEXTE(s)
@@ -165,7 +183,9 @@ fonction DUREE_TEXTE(s)
   finsi
 retourner remplacertexte(chaine(arrondi(s, 2)), ".", ",") + " s"
 
-&& ---------------------------------------------------------------- sélection
+&&
+&& sélection
+&&
 
 procedure CHOISIR(id)
   si cellule_choisie = id
@@ -205,7 +225,9 @@ fonction ID_DU_CONTROLE(ctl)
   suivant
 retourner 0
 
-&& ---------------------------------------------------------------- événements
+&&
+&& événements
+&&
 
 procedure CELLULE_CHANGEE(ev)
   si maj_ui
@@ -270,6 +292,8 @@ procedure CLIC_BOUTON_CELLULE(ev)
     si b.ctl = ev.id
       CHOISIR(b.id)
       faire cas
+      cas b.action = "masquer"
+        BASCULER_MASQUE(b.id)
       cas b.action = "executer"
         EXECUTER_CELLULE(b.id)
       cas b.action = "monter"
@@ -288,7 +312,76 @@ procedure CLIC_BOUTON_CELLULE(ev)
   suivant
 retourner
 
-&& ---------------------------------------------------------------- édition du carnet
+&&
+&& masquer, exporter
+&&
+
+procedure BASCULER_MASQUE(id)
+  locale c = CELLULE(id)
+  si c = nul
+    retourner
+  finsi
+  SYNC_SOURCES()
+  c.masquee = non c.masquee
+  APPLIQUER_MODE(c)
+  MAJ_ENTETE(c)
+  MARQUER_MODIFIE()
+  si non c.masquee
+    FOCUS_CELLULE(id)
+  finsi
+retourner
+
+&& tout masquer (genre = "code" : cellules de code et SQL seulement) ou tout afficher (masquer = faux)
+procedure MASQUER_TOUT(masquer, genre)
+  SYNC_SOURCES()
+  pour chaque c dans carnet.cellules
+    si non masquer ou genre = nul ou (genre = "code" et c.genre <> "markdown")
+      si c.masquee <> masquer
+        c.masquee = masquer
+        APPLIQUER_MODE(c)
+        MAJ_ENTETE(c)
+      finsi
+    finsi
+  suivant
+  MARQUER_MODIFIE()
+retourner
+
+procedure EXPORT_CHANGE(ev)
+  si maj_ui
+    retourner
+  finsi
+  pour chaque k, u dans UIC
+    si u.exp = ev.id
+      locale c = CELLULE(u.id)
+      si c <> nul
+        c.exporter = u.exp:coche(1)
+        CHOISIR(u.id)
+        MARQUER_MODIFIE()
+        STATUT(sisinon(c.exporter, "Cellule incluse dans les exports", "Cellule exclue des exports"))
+      finsi
+      retourner
+    finsi
+  suivant
+retourner
+
+procedure BASCULER_EXPORT(id)
+  locale c = CELLULE(id)
+  locale u = UIC[id]
+  si c = nul ou u = nul
+    retourner
+  finsi
+  c.exporter = non (c.exporter <> faux)
+  locale etait = maj_ui
+  maj_ui = vrai
+  u.exp:cocher(1, c.exporter)
+  maj_ui = etait
+  MARQUER_MODIFIE()
+  STATUT(sisinon(c.exporter, "Cellule incluse dans les exports", "Cellule exclue des exports"))
+retourner
+
+&&
+&& édition du carnet
+&&
 
 procedure SYNC_SOURCES
   si carnet = nul
@@ -375,6 +468,10 @@ procedure DUPLIQUER(id)
   SYNC_SOURCES()
   CHOISIR(id)
   INSERER_CELLULE(c.genre, c.source, 1)
+  && la copie garde le choix d'export de l'original
+  si c.exporter = faux et cellule_choisie <> id
+    BASCULER_EXPORT(cellule_choisie)
+  finsi
 retourner
 
 procedure SUPPRIMER(ev)
@@ -446,6 +543,7 @@ procedure EDITER_MARKDOWN(id)
   si c = nul ou u = nul ou c.genre <> "markdown"
     retourner
   finsi
+  c.masquee = faux
   u.edition = vrai
   APPLIQUER_MODE(c)
   MAJ_ENTETE(c)
@@ -485,7 +583,9 @@ procedure EFFACER_SORTIES(ev)
   STATUT("Sorties effacées")
 retourner
 
-&& ---------------------------------------------------------------- exécution (côté écran)
+&&
+&& exécution (côté écran)
+&&
 
 procedure EXECUTER_CHOISIE(ev)
   si cellule_choisie <> 0
