@@ -13,10 +13,11 @@
 &&   sorties.prg     affichage des résultats : texte, valeur, tableau, graphe, erreur
 &&   moteur.prg      noyau d'exécution : interpréteur séparé, file d'attente, protocole
 &&   export.prg      exports HTML, Markdown, PDF et programme .prg ; graphes en SVG
+&&   minicarte.prg   minimap : vignettes numérotées des cellules (aller, réordonner)
 &&   ressources/noyau.lxk  programme du noyau (copié dans un dossier temporaire)
 ui = paquet("interface")
 
-APP_NOM = "Carnet Lexis+ 1.0.1"
+APP_NOM = "Carnet Lexis+"
 reglages = LIRE_REGLAGES()
 carnet = nul                && document courant {titre, cellules, ...}
 chemin_carnet = ""          && fichier .lxnb ("" : jamais enregistré)
@@ -27,6 +28,18 @@ BOUTONS = {}                && boutons d'en-tête : {ctl, id, action}
 cellule_choisie = 0         && id de la cellule sélectionnée
 maj_ui = faux               && vrai pendant la construction (événements ignorés)
 derniere_sauvegarde = 0
+&& minimap (minicarte.prg)
+MINI_LARGEUR = 112
+MINI_HMIN = 24              && hauteur minimale d'une vignette
+MINI_HMAX = 140             && ... et maximale
+minicarte = nul             && panneau des vignettes
+mini_volet = faux           && vrai : volet du panneau des cellules (avant l'ascenseur)
+VIGNETTES = {}              && vignettes, dans l'ordre des cellules : {id, cadre, lbl}
+mini_structure = ""         && signature des cellules représentées (ordre, genres, état)
+mini_geometrie = ""         && signature des hauteurs et de la zone visible
+mini_glisse = nul           && glisser en cours : {id, y0, deplace, cible}
+mini_a_montrer = 0              && cellule à amener en haut de l'écran au prochain tic
+mini_minuterie = nul
 && noyau
 noyau_x = nul
 noyau_dossier = ""
@@ -117,6 +130,7 @@ pc = fen:ajouter(ui.panneau{disposition = "vertical", defilement = "vertical"})
 pc.ancrage = "centre"
 pc.marge = 12
 pc.espacement = 10
+MINI_CREER()
 
 && ligne de commande : [carnet.lxnb] [--executer] [--enregistrer] [--exporter f.html|.md|.pdf|.prg] [--quitter]
 depart = ""
@@ -228,7 +242,8 @@ retourner { ;
                  "Tout exécuter", "Exécuter les cellules au-dessus", "Exécuter à partir de la cellule", "-", ;
                  "Interrompre", "Redémarrer le noyau", "Redémarrer et tout exécuter", "-", ;
                  "Effacer toutes les sorties"}}, ;
-  {"Affichage", {"Thème sombre / clair", "Agrandir le texte du code", "Réduire le texte du code"}}, ;
+  {"Affichage", {"Thème sombre / clair", "Agrandir le texte du code", "Réduire le texte du code", "-", ;
+                 "Afficher la minimap", "Masquer la minimap"}}, ;
   {"Aide", {"Aide-mémoire", "Raccourcis clavier", "À propos"}}}
 
 procedure CONSTRUIRE_MENUS(m)
@@ -325,6 +340,10 @@ procedure MENU(ev)
     reglages.sombre = non reglages.sombre
     APPLIQUER_THEME()
     ECRIRE_REGLAGES()
+  cas choix = "Afficher la minimap"
+    MINI_AFFICHER(vrai)
+  cas choix = "Masquer la minimap"
+    MINI_AFFICHER(faux)
   cas choix = "Agrandir le texte du code"
     reglages.police = min(24, reglages.police + 1)
     TAILLE_POLICE()
@@ -538,6 +557,7 @@ procedure APPLIQUER_THEME
   finessayer
   pied.fond = sisinon(reglages.sombre, "#111827", "#E5E7EB")
   lbl_titre.couleur = sisinon(reglages.sombre, "#FBBF24", "#B45309")
+  MINI_COULEURS()
   locale garde = cellule_choisie
   SYNC_SOURCES()
   CONSTRUIRE_TOUT()
@@ -563,7 +583,7 @@ fonction FICHIER_REGLAGES()
 retourner fichier.joindre(fichier.dossierperso(), ".carnet_lexis.json")
 
 fonction LIRE_REGLAGES()
-  locale r = {sombre = vrai, dossier = fichier.dossierperso(), police = 14}
+  locale r = {sombre = vrai, dossier = fichier.dossierperso(), police = 14, minicarte = vrai}
   essayer
     locale p = FICHIER_REGLAGES()
     si fichier.existe(p)

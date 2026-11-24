@@ -285,6 +285,7 @@ blockquote { margin: 0; padding: 4px 14px; border-left: 3px solid var(--accent);
 a.anchor { margin-left: .3em; color: #9ca3af; text-decoration: none; font-weight: normal; opacity: 0; }
 h1:hover a.anchor, h2:hover a.anchor, h3:hover a.anchor, h4:hover a.anchor { opacity: 1; }
 footer { margin-top: 40px; color: var(--doux); font-size: .8em; text-align: center; }
+section.resultat .sorties { padding: 6px 12px 10px 12px; }
 details.masquee { margin: 18px 0; border: 1px dashed #d1d5db; border-radius: 8px; padding: 6px 12px; background: var(--carte); }
 details.masquee > summary { cursor: pointer; color: var(--doux); font-size: .9em; }
 details.masquee[open] > summary { margin-bottom: 6px; }
@@ -348,8 +349,8 @@ fonction HTML_CARNET()
   inserer "<header class=" + car(34) + "carnet" + car(34) + ">" + entete_h1 + "<p>Carnet Lexis+ · " + ;
           html(date()) + "</p></header>" dans o
   pour chaque c dans cellules
-    && cellule masquée à l'écran : repliée dans la page (un clic l'ouvre)
-    si c.masquee
+    && texte masqué à l'écran : replié dans la page (un clic l'ouvre)
+    si c.masquee et c.genre = "markdown"
       inserer "<details class=" + car(34) + "masquee" + car(34) + "><summary>" + ;
               html(sisinon(c.genre = "markdown", "Texte", sisinon(c.genre = "sql", "SQL", "Code"))) + " masqué : " + ;
               html(APERCU_CELLULE(c, 90)) + "</summary>" dans o
@@ -361,8 +362,15 @@ fonction HTML_CARNET()
       si c.genre = "sql"
         n = "SQL " + n
       finsi
-      inserer "<section class=" + car(34) + "cellule" + car(34) + "><div class=" + car(34) + "entree" + car(34) + "><div class=" + car(34) + "num" + car(34) + ">" + ;
-              n + "</div><pre class=" + car(34) + "code" + car(34) + ">" + html(c.source) + "</pre></div>" dans o
+      && code masqué : seul le résultat est exporté
+      si c.masquee
+        si taille(c.sorties) > 0
+          inserer "<section class=" + car(34) + "cellule resultat" + car(34) + ">" dans o
+        finsi
+      sinon
+        inserer "<section class=" + car(34) + "cellule" + car(34) + "><div class=" + car(34) + "entree" + car(34) + "><div class=" + car(34) + "num" + car(34) + ">" + ;
+                n + "</div><pre class=" + car(34) + "code" + car(34) + ">" + html(c.source) + "</pre></div>" dans o
+      finsi
       si taille(c.sorties) > 0
         inserer "<div class=" + car(34) + "sorties" + car(34) + ">" dans o
         pour chaque s dans c.sorties
@@ -370,9 +378,11 @@ fonction HTML_CARNET()
         suivant
         inserer "</div>" dans o
       finsi
-      inserer "</section>" dans o
+      si non c.masquee ou taille(c.sorties) > 0
+        inserer "</section>" dans o
+      finsi
     finsi
-    si c.masquee
+    si c.masquee et c.genre = "markdown"
       inserer "</details>" dans o
     finsi
   suivant
@@ -444,7 +454,10 @@ fonction MARKDOWN_CARNET(dossier_fig, prefixe)
     si c.genre = "markdown"
       inserer c.source + car(10) dans o
     sinon
-      inserer BLOC_MD(sisinon(c.genre = "sql", "sql", "lexis"), c.source) + car(10) dans o
+      && code masqué : seul le résultat est exporté
+      si non c.masquee
+        inserer BLOC_MD(sisinon(c.genre = "sql", "sql", "lexis"), c.source) + car(10) dans o
+      finsi
       pour chaque s dans c.sorties
         locale g = minuscule(chaine(s.genre))
         faire cas

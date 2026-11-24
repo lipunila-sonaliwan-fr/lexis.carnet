@@ -48,6 +48,7 @@ procedure CONSTRUIRE_TOUT
     CONSTRUIRE_CELLULE(c)
   suivant
   maj_ui = faux
+  MINI_RAFRAICHIR()
 retourner
 
 procedure CONSTRUIRE_CELLULE(c)
@@ -121,8 +122,9 @@ procedure APPLIQUER_MODE(c)
   si u = nul
     retourner
   finsi
-  && cellule masquée : seul le bandeau reste visible
-  u.sorties.visible = non c.masquee
+  && cellule masquée : seul le bandeau reste visible ; pour une cellule de code (Lexis+, SQL)
+  && incluse dans les exports, le résultat reste affiché (c'est lui seul qui est exporté)
+  u.sorties.visible = non c.masquee ou (c.genre <> "markdown" et c.exporter <> faux)
   si c.masquee
     u.ed.visible = faux
     u.md.visible = faux
@@ -200,6 +202,7 @@ procedure CHOISIR(id)
   si u <> nul
     u.entete.fond = COULEUR_ENTETE(vrai)
   finsi
+  MINI_RAFRAICHIR()
 retourner
 
 procedure FOCUS_CELLULE(id)
@@ -322,13 +325,13 @@ procedure BASCULER_MASQUE(id)
     retourner
   finsi
   SYNC_SOURCES()
+  CHOISIR(id)
   c.masquee = non c.masquee
-  APPLIQUER_MODE(c)
+  CHANGER_AFFICHAGE(c)
   MAJ_ENTETE(c)
   MARQUER_MODIFIE()
-  si non c.masquee
-    FOCUS_CELLULE(id)
-  finsi
+  && pas de focus sur l'éditeur déplié : le panneau défilerait pour le montrer en entier
+  && et le bandeau cliqué quitterait la position du pointeur
 retourner
 
 && tout masquer (genre = "code" : cellules de code et SQL seulement) ou tout afficher (masquer = faux)
@@ -338,12 +341,22 @@ procedure MASQUER_TOUT(masquer, genre)
     si non masquer ou genre = nul ou (genre = "code" et c.genre <> "markdown")
       si c.masquee <> masquer
         c.masquee = masquer
-        APPLIQUER_MODE(c)
+        CHANGER_AFFICHAGE(c)
         MAJ_ENTETE(c)
       finsi
     finsi
   suivant
   MARQUER_MODIFIE()
+retourner
+
+&& Masquer ou démasquer ne change que la hauteur de la cellule, SOUS son bandeau : le
+&& défilement du carnet est gardé, donc ce qui est au-dessus ne bouge pas et seul ce qui est
+&& dessous monte ou descend. L'ascenseur suit la nouvelle hauteur du contenu ; tout en bas,
+&& il s'arrête sur le bas de la dernière cellule (le carnet redescend si le contenu
+&& raccourcit au point de laisser un vide).
+procedure CHANGER_AFFICHAGE(c)
+  APPLIQUER_MODE(c)
+  MINI_RAFRAICHIR()
 retourner
 
 procedure EXPORT_CHANGE(ev)
@@ -356,6 +369,9 @@ procedure EXPORT_CHANGE(ev)
       si c <> nul
         c.exporter = u.exp:coche(1)
         CHOISIR(u.id)
+        si c.masquee et c.genre <> "markdown"
+          CHANGER_AFFICHAGE(c)
+        finsi
         MARQUER_MODIFIE()
         STATUT(sisinon(c.exporter, "Cellule incluse dans les exports", "Cellule exclue des exports"))
       finsi
@@ -375,6 +391,9 @@ procedure BASCULER_EXPORT(id)
   maj_ui = vrai
   u.exp:cocher(1, c.exporter)
   maj_ui = etait
+  si c.masquee et c.genre <> "markdown"
+    CHANGER_AFFICHAGE(c)
+  finsi
   MARQUER_MODIFIE()
   STATUT(sisinon(c.exporter, "Cellule incluse dans les exports", "Cellule exclue des exports"))
 retourner
@@ -458,6 +477,16 @@ procedure DEPLACER(id, sens)
   CHOISIR(garde)
   FOCUS_CELLULE(garde)
   MARQUER_MODIFIE()
+retourner
+
+&& remet les contrôles des cellules dans l'ordre du carnet (sans les reconstruire)
+procedure REORDONNER_CELLULES
+  pour chaque c dans carnet.cellules
+    locale u = UIC[c.id]
+    si u <> nul
+      pc:ajouter(u.bloc)
+    finsi
+  suivant
 retourner
 
 procedure DUPLIQUER(id)

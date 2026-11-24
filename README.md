@@ -51,9 +51,30 @@ L'en-tête d'une cellule de code montre son numéro d'exécution `[n]` (`[*]` : 
 cours) et sa durée.
 
 Une cellule **masquée** (▸) ne montre plus que son en-tête, avec sa première ligne en aperçu ;
-elle s'exécute normalement et ses sorties sont conservées. *Cellule › Masquer toutes les cellules
+elle s'exécute normalement et ses sorties sont conservées. Pour une cellule de code (Lexis+ ou
+SQL) masquée dont la case **Export** est cochée, seul le code est caché : son résultat reste
+affiché sous l'en-tête. Masquer ou afficher une cellule ne change que ce qui est sous elle (qui
+remonte ou descend) ; ce qui est au-dessus ne bouge pas, et l'ascenseur suit la nouvelle hauteur.
+Tout en bas, l'ascenseur s'arrête sur le bas de la dernière cellule, jamais sur un vide. *Cellule › Masquer toutes les cellules
 de code* replie tout le code (les textes restent lisibles) ; *Afficher toutes les cellules* les
 déplie. L'état masqué est enregistré avec le carnet.
+
+### Minimap
+
+À droite du carnet, juste avant l'ascenseur, une colonne de vignettes numérotées (une par
+cellule, dans l'ordre ; hauteur proportionnelle à celle de la cellule, couleur selon le genre :
+code, SQL, texte ; ◉ : cellule masquée) donne le plan du carnet :
+
+- les vignettes des cellules visibles à l'écran sont éclairées, celle de la cellule choisie est
+  numérotée en bleu ;
+- un **clic** sur une vignette amène sa cellule en haut de l'écran et la choisit ;
+- **glisser** une vignette vers le haut ou le bas déplace la cellule : la vignette d'arrivée est
+  marquée ▸ (en orange) et la barre d'état dit où la cellule ira ; relâcher la place avant elle
+  (en dessous de la dernière : à la fin).
+
+*Affichage › Afficher la minimap* / *Masquer la minimap* ; le choix est gardé dans les réglages.
+Avec un runtime qui n'a pas `panneau:volet` (voir les modifications du runtime livrées avec cette
+version), la minimap se place à droite de l'ascenseur et le glisser n'est montré qu'au relâchement.
 
 ## Écrire du code
 
@@ -94,8 +115,10 @@ s'affiche avec la ligne de la cellule et la pile d'appels traduite (« ligne 2 d
   procédures à la fin et des versions console de `afficher…` : le carnet devient un programme.
 
 Seules les cellules dont la case **Export** est cochée sont exportées (dans le `.prg`, une
-cellule exclue est remplacée par un commentaire). Dans la page HTML, une cellule masquée est
-repliée : un clic sur son aperçu l'ouvre.
+cellule exclue est remplacée par un commentaire). Une cellule de code masquée n'exporte que son
+résultat en HTML, Markdown et PDF (rien si elle n'a pas de sortie) ; le `.prg` garde son code,
+nécessaire à l'exécution. Une cellule de texte masquée est repliée dans la page HTML : un clic sur
+son aperçu l'ouvre.
 
 ## En ligne de commande (traitement par lots)
 
@@ -146,6 +169,7 @@ Une `source` peut aussi être une liste de lignes. `masquee` (cellule repliée) 
 | `sorties.prg` | résultats : texte, valeur, tableau, graphe, Markdown, erreur |
 | `moteur.prg` | noyau : interpréteur séparé, file d'attente, protocole, erreurs |
 | `export.prg` | exports HTML, Markdown, PDF, `.prg` ; graphes en SVG |
+| `minicarte.prg` | minimap : vignettes des cellules, aller à une cellule, réordonner par glisser |
 | `ressources/noyau.lxk` | programme du noyau et aides `afficher…` |
 | `exemples/*.lxnb` | carnet de découverte et aide-mémoire (déjà exécutés) |
 
