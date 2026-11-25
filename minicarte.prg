@@ -131,7 +131,19 @@ retourner
 
 && met à jour les vignettes (structure, hauteurs, zone visible, cellule choisie)
 procedure MINI_RAFRAICHIR
-  si minicarte = nul ou carnet = nul
+  si carnet = nul
+    retourner
+  finsi
+  && numéros des bandeaux : suivent l'ordre des cellules, minimap affichée ou non
+  locale ordre = ""
+  pour chaque c dans carnet.cellules
+    ordre = ordre + c.id + "|"
+  suivant
+  si ordre <> num_ordre
+    num_ordre = ordre
+    NUMEROTER()
+  finsi
+  si minicarte = nul
     retourner
   finsi
   si non minicarte.visible

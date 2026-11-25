@@ -47,8 +47,11 @@ Le menu **Fichier › Ouvrir le carnet de découverte** présente toutes les pos
 | Masquer / afficher une cellule | **▾ / ▸** au début de l'en-tête (ou *Cellule › Masquer / afficher la cellule*) |
 | Inclure ou exclure une cellule des exports | case **Export** de l'en-tête (ou *Cellule › Inclure / exclure des exports*) |
 
-L'en-tête d'une cellule de code montre son numéro d'exécution `[n]` (`[*]` : en attente ou en
-cours) et sa durée.
+L'en-tête de chaque cellule montre son numéro `[n]` : sa position dans le carnet, le même que
+sur la vignette de la minimap. Il ne change pas quand on exécute ou réexécute la cellule, seulement
+quand on ajoute, supprime ou déplace des cellules ; les messages d'erreur et l'export HTML
+désignent les cellules par ce numéro. L'en-tête d'une cellule de code montre aussi son état
+(en attente, en cours…) ou la durée de sa dernière exécution.
 
 Une cellule **masquée** (▸) ne montre plus que son en-tête, avec sa première ligne en aperçu ;
 elle s'exécute normalement et ses sorties sont conservées. Pour une cellule de code (Lexis+ ou

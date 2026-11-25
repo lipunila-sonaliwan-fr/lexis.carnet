@@ -358,7 +358,7 @@ fonction HTML_CARNET()
     si c.genre = "markdown"
       inserer "<section class=" + car(34) + "md" + car(34) + ">" + publication.html(c.source) + "</section>" dans o
     sinon
-      locale n = sisinon(c.compteur <> nul et c.compteur > 0, "[" + c.compteur + "]", "[ ]")
+      locale n = "[" + INDEX_CELLULE(c.id) + "]"
       si c.genre = "sql"
         n = "SQL " + n
       finsi

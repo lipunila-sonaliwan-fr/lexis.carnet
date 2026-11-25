@@ -17,7 +17,7 @@
 &&   ressources/noyau.lxk  programme du noyau (copié dans un dossier temporaire)
 ui = paquet("interface")
 
-APP_NOM = "Carnet Lexis+"
+APP_NOM = "Carnet Lexis+ 1.0.3"
 reglages = LIRE_REGLAGES()
 carnet = nul                && document courant {titre, cellules, ...}
 chemin_carnet = ""          && fichier .lxnb ("" : jamais enregistré)
@@ -40,6 +40,7 @@ mini_geometrie = ""         && signature des hauteurs et de la zone visible
 mini_glisse = nul           && glisser en cours : {id, y0, deplace, cible}
 mini_a_montrer = 0              && cellule à amener en haut de l'écran au prochain tic
 mini_minuterie = nul
+num_ordre = ""              && ordre des cellules au dernier numérotage des bandeaux
 && noyau
 noyau_x = nul
 noyau_dossier = ""

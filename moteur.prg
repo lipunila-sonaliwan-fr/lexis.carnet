@@ -629,16 +629,12 @@ fonction LIEU_CELLULE(ref)
 retourner nul
 
 && désignation d'une cellule dans un message : « ligne n » pour la cellule exécutée,
-&& « cellule [compteur] » (ou « cellule n° position ») pour une autre
+&& « cellule [n] » (n : numéro du bandeau et de la minimap) pour une autre
 fonction LIBELLE_LIEU(id, ligne, idcourant)
   si id = idcourant
     retourner "ligne " + ligne
   finsi
-  locale c = CELLULE(id)
-  si c <> nul et c.compteur <> nul et c.compteur > 0
-    retourner "cellule [" + c.compteur + "], ligne " + ligne
-  finsi
-retourner "cellule n° " + INDEX_CELLULE(id) + ", ligne " + ligne
+retourner "cellule [" + INDEX_CELLULE(id) + "], ligne " + ligne
 
 && pile d'appels du noyau -> références aux cellules du carnet
 fonction TRADUIRE_PILE(trace, idcourant)

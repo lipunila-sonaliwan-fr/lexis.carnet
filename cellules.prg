@@ -149,23 +149,20 @@ procedure MAJ_ENTETE(c)
   si u = nul
     retourner
   finsi
-  locale n = ""
+  && numéro = position de la cellule dans le carnet (le même que sur la minimap) ; il ne
+  && change pas quand on exécute, seulement si l'on ajoute, supprime ou déplace des cellules
+  locale n = NUMERO_CELLULE(c.id)
   locale info = ""
   si c.genre <> "markdown"
     faire cas
     cas c.etat = "attente"
-      n = "[*]"
       info = "en attente"
     cas c.etat = "cours"
-      n = "[*]"
       info = "en cours…"
     cas c.compteur <> nul et c.compteur > 0
-      n = "[" + c.compteur + "]"
       si c.duree <> nul
         info = DUREE_TEXTE(c.duree)
       finsi
-    autrement
-      n = "[ ]"
     fincas
   sinonsi u.edition
     info = "Maj+Entrée : afficher le rendu"
@@ -177,6 +174,25 @@ procedure MAJ_ENTETE(c)
   u.info.libelle = info
   u.repli.libelle = sisinon(c.masquee, "◉", "◎")
   u.repli.infobulle = sisinon(c.masquee, "Afficher la cellule", "Masquer la cellule")
+retourner
+
+fonction NUMERO_CELLULE(id)
+retourner "[" + INDEX_CELLULE(id) + "]"
+
+&& renumérote les bandeaux (après un ajout, une suppression ou un déplacement)
+procedure NUMEROTER
+  si carnet = nul
+    retourner
+  finsi
+  pour i = 1 a taille(carnet.cellules)
+    locale u = UIC[carnet.cellules[i].id]
+    si u <> nul
+      locale n = "[" + i + "]"
+      si u.num.libelle <> n
+        u.num.libelle = n
+      finsi
+    finsi
+  suivant
 retourner
 
 fonction DUREE_TEXTE(s)
