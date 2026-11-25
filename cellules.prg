@@ -226,14 +226,31 @@ procedure FOCUS_CELLULE(id)
   si u = nul
     retourner
   finsi
+  && cellule masquée : ni éditeur ni texte à l'écran, rien à qui donner le focus (un contrôle
+  && caché ferait défiler le carnet vers une position sans objet)
   essayer
     si u.ed.visible
       u.ed:focus()
-    sinon
+    sinonsi u.md.visible
       u.md:focus()
     finsi
   capturer e
   finessayer
+retourner
+
+&& focus donné après la prochaine mise en page : une cellule tout juste créée ou déplacée a
+&& encore l'ancienne position (ou aucune) ; le panneau défilerait vers un endroit périmé
+procedure FOCUS_DIFFERE(id)
+  focus_differe = id
+  ui.minuterie(40, @FOCUS_DIFFERE_TIC, faux)
+retourner
+
+procedure FOCUS_DIFFERE_TIC(ev)
+  locale id = focus_differe
+  focus_differe = 0
+  si id <> 0 et id = cellule_choisie
+    FOCUS_CELLULE(id)
+  finsi
 retourner
 
 fonction ID_DU_CONTROLE(ctl)
@@ -350,11 +367,12 @@ procedure BASCULER_MASQUE(id)
   && et le bandeau cliqué quitterait la position du pointeur
 retourner
 
-&& tout masquer (genre = "code" : cellules de code et SQL seulement) ou tout afficher (masquer = faux)
+&& masque (masquer = vrai) ou révèle les cellules d'un genre ("code" : Lexis+, "sql", "markdown")
+&& ou de tous les genres (genre = nul)
 procedure MASQUER_TOUT(masquer, genre)
   SYNC_SOURCES()
   pour chaque c dans carnet.cellules
-    si non masquer ou genre = nul ou (genre = "code" et c.genre <> "markdown")
+    si genre = nul ou c.genre = genre
       si c.masquee <> masquer
         c.masquee = masquer
         CHANGER_AFFICHAGE(c)
@@ -363,6 +381,21 @@ procedure MASQUER_TOUT(masquer, genre)
     finsi
   suivant
   MARQUER_MODIFIE()
+retourner
+
+&& Affichage › Code Lexis+ masquer / révéler (genre "code") et SQL DuckDB masquer / révéler
+&& (genre "sql") : masque toutes les cellules de ce genre si l'une d'elles est affichée, sinon
+&& les révèle toutes ; les cellules des autres genres ne changent pas
+procedure BASCULER_GENRE(genre)
+  locale masquer = faux
+  pour chaque c dans carnet.cellules
+    si c.genre = genre et non c.masquee
+      masquer = vrai
+    finsi
+  suivant
+  MASQUER_TOUT(masquer, genre)
+  locale quoi = sisinon(genre = "sql", "Cellules SQL DuckDB", "Cellules de code Lexis+")
+  STATUT(quoi + sisinon(masquer, " masquées", " révélées"))
 retourner
 
 && Masquer ou démasquer ne change que la hauteur de la cellule, SOUS son bandeau : le
@@ -461,10 +494,16 @@ procedure INSERER_CELLULE(genre, src, decalage)
     finessayer
   sinon
     inserer nc dans carnet.cellules position pos
-    CONSTRUIRE_TOUT()
+    && la nouvelle cellule est construite à la fin, puis les suivantes repassent derrière elle
+    CONSTRUIRE_CELLULE(nc)
+    REORDONNER_CELLULES(pos + 1)
   finsi
   CHOISIR(nc.id)
-  FOCUS_CELLULE(nc.id)
+  si pos > n
+    FOCUS_CELLULE(nc.id)
+  sinon
+    FOCUS_DIFFERE(nc.id)
+  finsi
   MARQUER_MODIFIE()
   MAJ_TITRE()
 retourner
@@ -487,22 +526,25 @@ procedure DEPLACER(id, sens)
   locale a = carnet.cellules[i]
   carnet.cellules[i] = carnet.cellules[j]
   carnet.cellules[j] = a
-  CONSTRUIRE_TOUT()
-  locale garde = cellule_choisie
-  cellule_choisie = 0
-  CHOISIR(garde)
-  FOCUS_CELLULE(garde)
+  REORDONNER_CELLULES(min(i, j))
+  FOCUS_DIFFERE(id)
   MARQUER_MODIFIE()
 retourner
 
-&& remet les contrôles des cellules dans l'ordre du carnet (sans les reconstruire)
-procedure REORDONNER_CELLULES
-  pour chaque c dans carnet.cellules
-    locale u = UIC[c.id]
+&& remet les contrôles des cellules dans l'ordre du carnet, sans les reconstruire (éditeurs et
+&& sorties gardés) : celles à partir de la position `depuis` repassent, dans l'ordre, en fin de
+&& panneau (« ajouter » un contrôle déjà placé le déplace)
+procedure REORDONNER_CELLULES(depuis)
+  si depuis = nul ou depuis < 1
+    depuis = 1
+  finsi
+  pour k = depuis a taille(carnet.cellules)
+    locale u = UIC[carnet.cellules[k].id]
     si u <> nul
       pc:ajouter(u.bloc)
     finsi
   suivant
+  NUMEROTER()
 retourner
 
 procedure DUPLIQUER(id)

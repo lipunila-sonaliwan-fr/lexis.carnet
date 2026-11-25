@@ -1,12 +1,13 @@
 && CC BY-NC-SA 4.0 - jean-marc "jihem" quere 2026
 && Carnet Lexis+ : minimap.
-&& Une colonne de vignettes numérotées, une par cellule, à droite du carnet, juste avant son
+&& Une colonne de vignettes numérotées (genre Lexis+ / SQL / Texte, ◉ masquée, ✓ exportée),
+&& une par cellule, à droite du carnet, juste avant son
 && ascenseur vertical (volet du panneau : elle ne défile pas avec les cellules).
 &&   - hauteur de chaque vignette proportionnelle à celle de la cellule ;
 &&   - vignettes des cellules visibles à l'écran éclairées, cellule choisie en bleu ;
 &&   - clic : amène la cellule en haut de l'écran et la choisit ;
 &&   - glisser une vignette vers le haut ou le bas : déplace la cellule à cet endroit.
-&& Affichage › Afficher / Masquer la minimap ; le choix est gardé dans les réglages.
+&& Affichage › Minimap masquer / afficher ; le choix est gardé dans les réglages.
 && Une minuterie suit le défilement et les changements du carnet (ajout, masquage, sorties...).
 
 && variables globales : voir principal.prg (minimap)
@@ -54,6 +55,7 @@ procedure MINI_AFFICHER(oui)
   finsi
   minicarte.visible = oui
   mini_structure = ""
+  mini_cle = ""
   MINI_RAFRAICHIR()
   STATUT(sisinon(oui, "Minimap affichée", "Minimap masquée"))
 retourner
@@ -78,24 +80,37 @@ fonction MINI_FOND(c, visible)
   fincas
 retourner sisinon(visible, "#C7D7F2", "#E6EDF9")
 
+&& libellé d'une vignette : numéro et genre (Lexis+, SQL, Texte) ; les marques ◉ (masquée) et
+&& ✓ (exportée) sont dans deux colonnes de largeur fixe à droite, vides si la marque est absente,
+&& pour rester alignées d'une vignette à l'autre
 fonction MINI_TEXTE(c, n)
-  locale g = "Lx"
+  locale g = "Lexis+"
   faire cas
   cas c.genre = "markdown"
-    g = "Txt"
+    g = "Texte"
   cas c.genre = "sql"
     g = "SQL"
   fincas
-retourner chaine(n) + "  " + g + sisinon(c.masquee, "  ◉", "")
+retourner chaine(n) + " " + g
 
-&& signature de la structure : si elle change, les vignettes sont reconstruites
+&& signature de la structure (thème, ordre et genre des cellules) : si elle change, les
+&& vignettes sont reconstruites et les bandeaux renumérotés ; masquer une cellule ou changer
+&& son export ne touche qu'au libellé de sa vignette
 fonction MINI_SIGNATURE()
   locale s = sisinon(reglages.sombre, "s", "c")
   si carnet <> nul
     pour chaque c dans carnet.cellules
-      s = s + "|" + c.id + c.genre + sisinon(c.masquee, "m", "") + sisinon(c.exporter = faux, "x", "")
+      s = s + "|" + c.id + c.genre
     suivant
   finsi
+retourner s
+
+&& état affiché par les libellés et les couleurs (masquage, export, cellule choisie)
+fonction MINI_ETAT()
+  locale s = chaine(cellule_choisie)
+  pour chaque c dans carnet.cellules
+    s = s + sisinon(c.masquee, "m", "-") + sisinon(c.exporter = faux, "x", "-")
+  suivant
 retourner s
 
 procedure MINI_RECONSTRUIRE
@@ -107,6 +122,7 @@ procedure MINI_RECONSTRUIRE
   suivant
   VIGNETTES = {}
   mini_geometrie = ""
+  mini_cle = ""
   si carnet = nul
     retourner
   finsi
@@ -118,8 +134,18 @@ procedure MINI_RECONSTRUIRE
     v.cadre.espacement = 0
     v.cadre.hauteurfixe = MINI_HMIN
     v.cadre.fond = MINI_FOND(c, faux)
-    v.lbl = v.cadre:ajouter(ui.etiquette(MINI_TEXTE(c, i)))
+    v.ligne = v.cadre:ajouter(ui.rangee())
+    v.ligne.marge = 0
+    v.ligne.espacement = 0
+    v.lbl = v.ligne:ajouter(ui.etiquette(MINI_TEXTE(c, i)))
+    v.lbl.poids = 1
     v.lbl.couleur = "#9CA3AF"
+    v.lm = v.ligne:ajouter(ui.etiquette(""))
+    v.lm.largeurfixe = 20
+    v.lm.couleur = "#9CA3AF"
+    v.lx = v.ligne:ajouter(ui.etiquette(""))
+    v.lx.largeurfixe = 20
+    v.lx.couleur = "#9CA3AF"
     v.lbl.infobulle = "n° " + i + " · " + LIBELLE_GENRE(c.genre) + " : " + APERCU_CELLULE(c, 60) + ;
                       "  —  clic : y aller ; glisser : la déplacer"
     v.cadre.surboutonbas = @MINI_BAS
@@ -134,13 +160,10 @@ procedure MINI_RAFRAICHIR
   si carnet = nul
     retourner
   finsi
+  locale sig = MINI_SIGNATURE()
   && numéros des bandeaux : suivent l'ordre des cellules, minimap affichée ou non
-  locale ordre = ""
-  pour chaque c dans carnet.cellules
-    ordre = ordre + c.id + "|"
-  suivant
-  si ordre <> num_ordre
-    num_ordre = ordre
+  si sig <> num_ordre
+    num_ordre = sig
     NUMEROTER()
   finsi
   si minicarte = nul
@@ -149,10 +172,29 @@ procedure MINI_RAFRAICHIR
   si non minicarte.visible
     retourner
   finsi
-  locale sig = MINI_SIGNATURE()
   si sig <> mini_structure ou taille(VIGNETTES) <> taille(carnet.cellules)
     mini_structure = sig
     MINI_RECONSTRUIRE()
+  finsi
+  && réactivité : une seule lecture (défilement, hauteur du contenu, zone visible) suffit à
+  && savoir si quelque chose a bougé ; sinon rien n'est relu, sauf une vérification complète
+  && toutes les 2 secondes environ (une cellule qui grandit pendant qu'une autre rétrécit)
+  si mini_glisse = nul
+    locale cle = MINI_ETAT()
+    locale pos = nul
+    essayer
+      pos = pc:position()
+    capturer e
+    finessayer
+    si pos <> nul
+      cle = cle + "|" + arrondi(pos.y) + "|" + arrondi(pos.hauteur) + "|" + arrondi(pos.vuehauteur)
+      mini_tics += 1
+      si cle = mini_cle et mini_tics < 14
+        retourner
+      finsi
+      mini_cle = cle
+      mini_tics = 0
+    finsi
   finsi
   && géométrie des cellules (dimensions de la dernière mise en page)
   locale haut = 0, vue = 0
@@ -219,7 +261,19 @@ procedure MINI_RAFRAICHIR
       finsi
       si v.couleur_vue <> couleur
         v.lbl.couleur = couleur
+        v.lm.couleur = couleur
+        v.lx.couleur = couleur
         v.couleur_vue = couleur
+      finsi
+      locale marque = sisinon(c.masquee, "◉", "")
+      si v.masque_vue <> marque
+        v.lm.libelle = marque
+        v.masque_vue = marque
+      finsi
+      marque = sisinon(c.exporter <> faux, "✓", "")
+      si v.export_vu <> marque
+        v.lx.libelle = marque
+        v.export_vu = marque
       finsi
       locale texte = MINI_TEXTE(c, i)
       si mini_glisse <> nul et mini_glisse.deplace et i = mini_glisse.cible
@@ -257,7 +311,8 @@ retourner
 
 fonction MINI_VIGNETTE(ctl)
   pour i = 1 a taille(VIGNETTES)
-    si VIGNETTES[i].cadre = ctl ou VIGNETTES[i].lbl = ctl
+    locale v = VIGNETTES[i]
+    si v.cadre = ctl ou v.ligne = ctl ou v.lbl = ctl ou v.lm = ctl ou v.lx = ctl
       retourner i
     finsi
   suivant
@@ -339,6 +394,7 @@ procedure MINI_DEPLACER(id, p)
   locale i = INDEX_CELLULE(id)
   si i = 0 ou p = i ou p = i + 1
     mini_geometrie = ""
+    mini_cle = ""
     MINI_RAFRAICHIR()
     STATUT("")
     retourner
@@ -354,7 +410,7 @@ procedure MINI_DEPLACER(id, p)
   sinon
     inserer c dans carnet.cellules position p
   finsi
-  REORDONNER_CELLULES()
+  REORDONNER_CELLULES(min(i, p))
   MARQUER_MODIFIE()
   STATUT("Cellule déplacée en position " + p)
   mini_a_montrer = id

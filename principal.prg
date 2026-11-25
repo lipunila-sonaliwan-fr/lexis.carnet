@@ -17,7 +17,7 @@
 &&   ressources/noyau.lxk  programme du noyau (copié dans un dossier temporaire)
 ui = paquet("interface")
 
-APP_NOM = "Carnet Lexis+ 1.0.3"
+APP_NOM = "Carnet Lexis+ 1.0.4"
 reglages = LIRE_REGLAGES()
 carnet = nul                && document courant {titre, cellules, ...}
 chemin_carnet = ""          && fichier .lxnb ("" : jamais enregistré)
@@ -29,7 +29,7 @@ cellule_choisie = 0         && id de la cellule sélectionnée
 maj_ui = faux               && vrai pendant la construction (événements ignorés)
 derniere_sauvegarde = 0
 && minimap (minicarte.prg)
-MINI_LARGEUR = 112
+MINI_LARGEUR = 128
 MINI_HMIN = 24              && hauteur minimale d'une vignette
 MINI_HMAX = 140             && ... et maximale
 minicarte = nul             && panneau des vignettes
@@ -40,6 +40,9 @@ mini_geometrie = ""         && signature des hauteurs et de la zone visible
 mini_glisse = nul           && glisser en cours : {id, y0, deplace, cible}
 mini_a_montrer = 0              && cellule à amener en haut de l'écran au prochain tic
 mini_minuterie = nul
+mini_cle = ""               && dernier état vu par la minuterie (défilement, contenu, état)
+mini_tics = 0
+focus_differe = 0           && cellule à qui donner le focus après la mise en page
 num_ordre = ""              && ordre des cellules au dernier numérotage des bandeaux
 && noyau
 noyau_x = nul
@@ -232,19 +235,18 @@ retourner { ;
                "Renommer le carnet…", "-", ;
                "Exporter en HTML…", "Exporter en Markdown…", "Exporter en PDF…", "Exporter en programme .prg…", "-", ;
                "Ouvrir le carnet de découverte", "-", "Quitter"}}, ;
-  {"Cellule", {"Insérer du code dessous", "Insérer du texte (Markdown) dessous", "Insérer du SQL dessous", ;
-               "Insérer du code dessus", "-", ;
+  {"Cellule", {"Ajouter du Code Lexis+ (après)", "Ajouter du SQL DuckDB", "Ajouter du Texte Markdown", "-", ;
+               "Insérer du Code Lexis+ (avant)", "Insérer du SQL DuckDB", "Insérer du Texte Markdown", "-", ;
                "Monter", "Descendre", "Dupliquer", "Supprimer", "-", ;
-               "Changer en code Lexis+", "Changer en texte Markdown", "Changer en SQL", "-", ;
+               "Changer en Code Lexis+", "Changer en SQL DuckDB", "Changer en Texte Markdown", "-", ;
                "Modifier le texte (cellule Markdown)", "Effacer les sorties de la cellule", "-", ;
-               "Masquer / afficher la cellule", "Inclure / exclure des exports", ;
-               "Masquer toutes les cellules de code", "Afficher toutes les cellules"}}, ;
+               "Masquer / afficher la cellule", "Inclure / exclure des exports"}}, ;
   {"Exécution", {"Exécuter la cellule (Ctrl+Entrée)", "Exécuter et passer à la suivante (Maj+Entrée)", ;
                  "Tout exécuter", "Exécuter les cellules au-dessus", "Exécuter à partir de la cellule", "-", ;
                  "Interrompre", "Redémarrer le noyau", "Redémarrer et tout exécuter", "-", ;
                  "Effacer toutes les sorties"}}, ;
   {"Affichage", {"Thème sombre / clair", "Agrandir le texte du code", "Réduire le texte du code", "-", ;
-                 "Afficher la minimap", "Masquer la minimap"}}, ;
+                 "Minimap masquer / afficher", "Code Lexis+ masquer / révéler", "SQL DuckDB masquer / révéler"}}, ;
   {"Aide", {"Aide-mémoire", "Raccourcis clavier", "À propos"}}}
 
 procedure CONSTRUIRE_MENUS(m)
@@ -284,14 +286,18 @@ procedure MENU(ev)
   cas choix = "Quitter"
     FERMETURE(nul)
     ui.quitter()
-  cas choix = "Insérer du code dessous"
-    AJOUTER_CODE(nul)
-  cas choix = "Insérer du texte (Markdown) dessous"
-    AJOUTER_TEXTE(nul)
-  cas choix = "Insérer du SQL dessous"
-    AJOUTER_SQL(nul)
-  cas choix = "Insérer du code dessus"
+  cas choix = "Ajouter du Code Lexis+ (après)"
+    INSERER_CELLULE("code", "", 1)
+  cas choix = "Ajouter du SQL DuckDB"
+    INSERER_CELLULE("sql", "", 1)
+  cas choix = "Ajouter du Texte Markdown"
+    INSERER_CELLULE("markdown", "", 1)
+  cas choix = "Insérer du Code Lexis+ (avant)"
     INSERER_CELLULE("code", "", 0)
+  cas choix = "Insérer du SQL DuckDB"
+    INSERER_CELLULE("sql", "", 0)
+  cas choix = "Insérer du Texte Markdown"
+    INSERER_CELLULE("markdown", "", 0)
   cas choix = "Monter"
     MONTER(nul)
   cas choix = "Descendre"
@@ -300,11 +306,11 @@ procedure MENU(ev)
     DUPLIQUER(cellule_choisie)
   cas choix = "Supprimer"
     SUPPRIMER(nul)
-  cas choix = "Changer en code Lexis+"
+  cas choix = "Changer en Code Lexis+"
     CHANGER_GENRE(cellule_choisie, "code")
-  cas choix = "Changer en texte Markdown"
+  cas choix = "Changer en Texte Markdown"
     CHANGER_GENRE(cellule_choisie, "markdown")
-  cas choix = "Changer en SQL"
+  cas choix = "Changer en SQL DuckDB"
     CHANGER_GENRE(cellule_choisie, "sql")
   cas choix = "Modifier le texte (cellule Markdown)"
     EDITER_MARKDOWN(cellule_choisie)
@@ -314,10 +320,10 @@ procedure MENU(ev)
     BASCULER_MASQUE(cellule_choisie)
   cas choix = "Inclure / exclure des exports"
     BASCULER_EXPORT(cellule_choisie)
-  cas choix = "Masquer toutes les cellules de code"
-    MASQUER_TOUT(vrai, "code")
-  cas choix = "Afficher toutes les cellules"
-    MASQUER_TOUT(faux, nul)
+  cas choix = "Code Lexis+ masquer / révéler"
+    BASCULER_GENRE("code")
+  cas choix = "SQL DuckDB masquer / révéler"
+    BASCULER_GENRE("sql")
   cas commencepar(choix, "Exécuter la cellule")
     EXECUTER_CHOISIE(nul)
   cas commencepar(choix, "Exécuter et passer")
@@ -341,10 +347,8 @@ procedure MENU(ev)
     reglages.sombre = non reglages.sombre
     APPLIQUER_THEME()
     ECRIRE_REGLAGES()
-  cas choix = "Afficher la minimap"
-    MINI_AFFICHER(vrai)
-  cas choix = "Masquer la minimap"
-    MINI_AFFICHER(faux)
+  cas choix = "Minimap masquer / afficher"
+    MINI_AFFICHER(non (reglages.minicarte <> faux))
   cas choix = "Agrandir le texte du code"
     reglages.police = min(24, reglages.police + 1)
     TAILLE_POLICE()

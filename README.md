@@ -39,7 +39,9 @@ Le menu **Fichier › Ouvrir le carnet de découverte** présente toutes les pos
 | Exécuter la cellule | **Ctrl+Entrée**, ou ▶ dans son en-tête |
 | Tout exécuter | **▶▶ Tout** ; l'exécution s'arrête à la première erreur |
 | Modifier un texte | **double-clic** sur le rendu ; **Maj+Entrée** affiche à nouveau le rendu |
-| Insérer | **+ Code**, **+ Texte**, **+ SQL** (sous la cellule choisie), **+** dans l'en-tête |
+| Ajouter (après la cellule choisie) | **+ Code**, **+ SQL**, **+ Texte**, **+** dans l'en-tête, ou *Cellule › Ajouter du Code Lexis+ (après)*, *du SQL DuckDB*, *du Texte Markdown* |
+| Insérer (avant la cellule choisie) | *Cellule › Insérer du Code Lexis+ (avant)*, *du SQL DuckDB*, *du Texte Markdown* |
+| Changer le genre d'une cellule | *Cellule › Changer en Code Lexis+*, *en SQL DuckDB*, *en Texte Markdown* |
 | Déplacer, dupliquer, supprimer | ▲ ▼ ⧉ ✕ (en-tête ou barre d'outils) |
 | Arrêter une boucle sans fin | **■ Interrompre** : le noyau redémarre, ses variables sont effacées |
 | Repartir de zéro | **↻ Redémarrer** (ou *Exécution › Redémarrer et tout exécuter*) |
@@ -58,15 +60,17 @@ elle s'exécute normalement et ses sorties sont conservées. Pour une cellule de
 SQL) masquée dont la case **Export** est cochée, seul le code est caché : son résultat reste
 affiché sous l'en-tête. Masquer ou afficher une cellule ne change que ce qui est sous elle (qui
 remonte ou descend) ; ce qui est au-dessus ne bouge pas, et l'ascenseur suit la nouvelle hauteur.
-Tout en bas, l'ascenseur s'arrête sur le bas de la dernière cellule, jamais sur un vide. *Cellule › Masquer toutes les cellules
-de code* replie tout le code (les textes restent lisibles) ; *Afficher toutes les cellules* les
-déplie. L'état masqué est enregistré avec le carnet.
+Tout en bas, l'ascenseur s'arrête sur le bas de la dernière cellule, jamais sur un vide. *Affichage › Code Lexis+
+masquer / révéler* masque toutes les cellules Lexis+ si l'une d'elles est affichée, sinon les
+révèle toutes ; *Affichage › SQL DuckDB masquer / révéler* fait de même pour les cellules SQL.
+Les autres cellules ne changent pas. L'état masqué est enregistré avec le carnet.
 
 ### Minimap
 
 À droite du carnet, juste avant l'ascenseur, une colonne de vignettes numérotées (une par
 cellule, dans l'ordre ; hauteur proportionnelle à celle de la cellule, couleur selon le genre :
-code, SQL, texte ; ◉ : cellule masquée) donne le plan du carnet :
+Lexis+, SQL, Texte, écrit en clair sur la vignette ; à droite, alignées d'une vignette à
+l'autre, ◉ : cellule masquée et ✓ : cellule exportée) donne le plan du carnet :
 
 - les vignettes des cellules visibles à l'écran sont éclairées, celle de la cellule choisie est
   numérotée en bleu ;
@@ -75,7 +79,7 @@ code, SQL, texte ; ◉ : cellule masquée) donne le plan du carnet :
   marquée ▸ (en orange) et la barre d'état dit où la cellule ira ; relâcher la place avant elle
   (en dessous de la dernière : à la fin).
 
-*Affichage › Afficher la minimap* / *Masquer la minimap* ; le choix est gardé dans les réglages.
+*Affichage › Minimap masquer / afficher* ; le choix est gardé dans les réglages.
 Avec un runtime qui n'a pas `panneau:volet` (voir les modifications du runtime livrées avec cette
 version), la minimap se place à droite de l'ascenseur et le glisser n'est montré qu'au relâchement.
 
