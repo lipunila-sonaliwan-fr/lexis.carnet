@@ -4,10 +4,13 @@
 && Format .lxnb (JSON, UTF-8) :
 &&   {"format": "lexis-carnet", "version": 1,
 &&    "metadonnees": {"titre": "...", "cree": "AAAA-MM-JJ HH:MM:SS", "modifie": "..."},
-&&    "cellules": [{"genre": "code" | "markdown" | "sql", "source": "...",
+&&    "cellules": [{"genre": "code" | "markdown" | "sql" | "planif", "source": "...",
 &&                  "compteur": n, "duree": s, "sorties": [...],
 &&                  "masquee": true,      (facultatif : cellule repliée à l'écran)
-&&                  "export": false}]}    (facultatif : cellule exclue des exports)
+&&                  "export": false,      (facultatif : cellule exclue des exports)
+&&                  "intervalle": "+1min"}]}  (planificateur : période entre deux lancements)
+&& La cellule « planif » (planificateur, voir planificateur.prg) est toujours la première ;
+&& sa case « export » est sa case d'activation (elle n'est jamais exportée).
 && Sorties : {"genre": "texte" | "valeur" | "markdown", "texte": "..."}
 &&           {"genre": "table", "colonnes": [...], "lignes": [[...]], "total": n}
 &&           {"genre": "graphe", "forme": "colonnes|lignes|aires|secteurs", "titre": "...",
@@ -24,6 +27,78 @@ fonction NOUVELLE_CELLULE(genre, src)
               compteur = 0, duree = nul, sorties = {}, masquee = faux, exporter = vrai}
   prochain_id += 1
 retourner c
+
+&& planificateur : une cellule de code Lexis+ en première position, masquée et inactive au départ
+fonction NOUVEAU_PLANIF()
+  locale c = NOUVELLE_CELLULE("planif", "&& Planificateur : ce code est lancé en tâche de fond, sur un noyau dédié, à" + car(10) + ;
+    "&& la période choisie, quand la cellule est masquée et sa case cochée." + car(10) + ;
+    "&& executer_cellule(n) : exécute la cellule [n] ; executer_depuis(n) : de [n] à la fin." + car(10) + ;
+    "&& Seules les cellules de code ou SQL masquées s'exécutent (les autres : sans effet)." + car(10))
+  c.masquee = vrai
+  c.exporter = faux
+  c.intervalle = "+1min"
+retourner c
+
+&& met le planificateur en tête du carnet (le crée s'il manque ; un seul est gardé)
+procedure ASSURER_PLANIF(cn)
+  locale p = nul
+  locale reste = {}
+  pour chaque c dans cn.cellules
+    si c.genre = "planif"
+      si p = nul
+        p = c
+      finsi
+    sinon
+      inserer c dans reste
+    finsi
+  suivant
+  si p = nul
+    p = NOUVEAU_PLANIF()
+  finsi
+  inserer p dans reste position 1
+  cn.cellules = reste
+retourner
+
+&& la cellule du planificateur (nul si le carnet n'en a pas)
+fonction PLANIF_CELLULE()
+  si carnet = nul ou taille(carnet.cellules) = 0
+    retourner nul
+  finsi
+  si carnet.cellules[1].genre = "planif"
+    retourner carnet.cellules[1]
+  finsi
+retourner nul
+
+&& numéro d'une cellule (bandeau, minimap, messages, exports) : « * » pour le planificateur,
+&& sinon sa position parmi les autres cellules
+fonction NUMERO(id)
+  locale n = 0
+  si carnet <> nul
+    pour chaque c dans carnet.cellules
+      si c.genre <> "planif"
+        n += 1
+      finsi
+      si c.id = id
+        retourner sisinon(c.genre = "planif", "*", n)
+      finsi
+    suivant
+  finsi
+retourner 0
+
+&& la cellule [n] (nul si elle n'existe pas)
+fonction CELLULE_NUMERO(n)
+  locale k = 0
+  si carnet <> nul
+    pour chaque c dans carnet.cellules
+      si c.genre <> "planif"
+        k += 1
+        si k = n
+          retourner c
+        finsi
+      finsi
+    suivant
+  finsi
+retourner nul
 
 fonction TITRE_CARNET()
   si carnet = nul ou carnet.metadonnees = nul ou carnet.metadonnees.titre = nul
@@ -64,7 +139,9 @@ fonction NOM_FICHIER_SUR(t)
   finsi
 retourner minuscule(r)
 
-&& ---------------------------------------------------------------- lecture
+&&
+&& lecture
+&&
 
 fonction LIRE_CARNET(p)
   locale brut = dejson(fichier.lire(p))
@@ -86,7 +163,7 @@ fonction LIRE_CARNET(p)
   finsi
   pour chaque bc dans brut.cellules
     locale genre = minuscule(chaine(sisinon(bc.genre = nul, "code", bc.genre)))
-    si non contient({"code", "markdown", "sql"}, genre)
+    si non contient({"code", "markdown", "sql", "planif"}, genre)
       genre = "code"
     finsi
     locale cel = NOUVELLE_CELLULE(genre, SOURCE_TEXTE(bc.source))
@@ -94,6 +171,9 @@ fonction LIRE_CARNET(p)
     cel.duree = bc.duree
     cel.masquee = (bc.masquee = vrai)
     cel.exporter = (bc.export <> faux)
+    si genre = "planif"
+      cel.intervalle = chaine(sisinon(bc.intervalle = nul, "+1min", bc.intervalle))
+    finsi
     si type(bc.sorties) = "table"
       pour chaque s dans bc.sorties
         inserer s dans cel.sorties
@@ -101,6 +181,7 @@ fonction LIRE_CARNET(p)
     finsi
     inserer cel dans c.cellules
   suivant
+  ASSURER_PLANIF(c)
 retourner c
 
 && une source peut être un texte ou une liste de lignes (comme dans Jupyter)
@@ -113,7 +194,9 @@ fonction SOURCE_TEXTE(s)
   finsi
 retourner remplacertexte(chaine(s), car(13), "")
 
-&& ---------------------------------------------------------------- écriture
+&&
+&& écriture
+&&
 
 procedure ECRIRE_CARNET(p)
   SYNC_SOURCES()
@@ -126,6 +209,9 @@ procedure ECRIRE_CARNET(p)
     finsi
     si non c.exporter
       x.export = faux
+    finsi
+    si c.genre = "planif"
+      x.intervalle = c.intervalle
     finsi
     si c.genre <> "markdown"
       x.compteur = sisinon(c.compteur = nul, 0, c.compteur)
@@ -185,11 +271,11 @@ fonction ENCODER_JSON(v, retrait)
   suivant
 retourner "{" + car(10) + suite + joindre(champs, "," + car(10) + suite) + car(10) + retrait + "}"
 
-&& cellules incluses dans les exports (case « Export » du bandeau)
+&& cellules incluses dans les exports (case « Export » du bandeau ; jamais le planificateur)
 fonction CELLULES_EXPORT()
   locale l = {}
   pour chaque c dans carnet.cellules
-    si c.exporter <> faux
+    si c.exporter <> faux et c.genre <> "planif"
       inserer c dans l
     finsi
   suivant

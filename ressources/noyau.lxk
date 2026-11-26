@@ -6,7 +6,12 @@
 && Chaque cellule est une procédure chargée par lexis.charger : les variables non
 && déclarées sont globales et restent d'une cellule à l'autre.
 && Les sorties enrichies sont des lignes « car(30) NB:sortie:<json> ».
+&& Planificateur : le carnet lance un second noyau (même programme) pour la cellule du
+&& planificateur ; executer_cellule(n) et executer_depuis(n) y demandent au carnet le code des
+&& cellules par « car(30) NB:demande:… » suivi d'une saisie (réponse : une commande X|… ou un
+&& refus) et les exécutent sur place. Dans le noyau principal, le carnet refuse toujours.
 NB_FIN = faux
+NB_OK = faux
 NB_MAX_LIGNES = 1000
 essayer
   ouvrirbase(":memoire:")
@@ -38,7 +43,9 @@ procedure NB_EXECUTER(p)
     lexis.charger(p[3])
     appeler(lexis.procedure(p[4]))
     ? car(30) + "NB:fin:" + p[5] + ":ok:" + chaine(arrondi(systeme.horloge() - t0, 3))
+    NB_OK = vrai
   capturer e
+    NB_OK = faux
     locale pile = pileerreur()
     si pile = nul ou pile = ""
       pile = chaine(e)
@@ -46,6 +53,38 @@ procedure NB_EXECUTER(p)
     ? car(30) + "NB:fin:" + p[5] + ":erreur:" + json(pile)
   finessayer
 retourner
+
+&& executer_cellule(n) : exécute la cellule [n] du carnet (planificateur seulement).
+&& Renvoie vrai (exécutée), faux (en erreur : l'erreur est dans ses sorties) ou nul (sans
+&& effet : cellule inexistante, de texte, affichée, déjà en cours, ou hors planificateur).
+fonction EXECUTER_CELLULE(n)
+  ? car(30) + "NB:demande:cellule:" + chaine(n)
+  locale r = saisir("")
+  si r = nul ou non commencepar(r, "X|")
+    retourner nul
+  finsi
+  NB_EXECUTER(decouper(r, "|"))
+retourner NB_OK
+
+&& executer_depuis(n) : exécute les cellules de code et SQL masquées de [n] à la fin, dans
+&& l'ordre ; s'arrête à la première en erreur. Renvoie le nombre de cellules exécutées.
+fonction EXECUTER_DEPUIS(n)
+  ? car(30) + "NB:demande:liste:" + chaine(n)
+  locale r = saisir("")
+  locale nb = 0
+  si r = nul ou r = "" ou commencepar(r, "§")
+    retourner 0
+  finsi
+  pour chaque x dans decouper(r, ",")
+    locale ok = EXECUTER_CELLULE(valeur(x))
+    si ok = faux
+      retourner nb
+    finsi
+    si ok = vrai
+      nb += 1
+    finsi
+  suivant
+retourner nb
 
 procedure NB_EMETTRE(t)
   ? car(30) + "NB:sortie:" + json(t)

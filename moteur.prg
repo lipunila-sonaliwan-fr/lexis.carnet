@@ -39,6 +39,7 @@ procedure NOYAU_DEMARRER
   finsi
   noyau_pret = faux
   pret_annonce = faux
+  noyau_requete = faux
   noyau_tampon = ""
   arret_voulu = faux
   defs_procs = {}
@@ -71,6 +72,7 @@ retourner
 
 procedure NOYAU_TERMINER
   quitter_demande = vrai
+  PLANIF_ARRETER(faux)
   essayer
     si noyau_x <> nul et noyau_x:actif()
       noyau_x:arreter()
@@ -113,11 +115,17 @@ procedure REDEMARRER(ev)
   STATUT("Noyau redémarré : les variables et procédures des cellules sont effacées.")
 retourner
 
-&& ---------------------------------------------------------------- file d'attente
+&&
+&& file d'attente
+&&
 
 procedure NOYAU_SOUMETTRE(id)
   locale c = CELLULE(id)
-  si c = nul ou id = cellule_en_cours ou contient(file_attente, id)
+  si c = nul ou id = cellule_en_cours ou contient(file_attente, id) ou c.genre = "planif"
+    retourner
+  finsi
+  si PLANIF_TIENT(id)
+    STATUT("Cellule [" + NUMERO(id) + "] en cours d'exécution dans le planificateur")
     retourner
   finsi
   si noyau_x = nul
@@ -193,7 +201,7 @@ procedure LANCER_CELLULE(c)
   cellule_en_cours = c.id
   exec_en_cours = chaine(c.id) + "." + chaine(exec_seq)
   noyau_pret = faux
-  NOYAU_ETAT("occupé (cellule " + INDEX_CELLULE(c.id) + ")")
+  NOYAU_ETAT("occupé (cellule " + NUMERO(c.id) + ")")
   noyau_x:envoyer("X|" + prep.procs + "|" + prep.fichier + "|NB_CELLULE_" + c.id + "|" + exec_en_cours)
 retourner
 
@@ -417,7 +425,9 @@ procedure DIAG_CELLULE(dg, ln, idcell, idcourant, diags, messages, res)
   finsi
 retourner
 
-&& ---------------------------------------------------------------- réception
+&&
+&& réception
+&&
 
 procedure NOYAU_SORTIE(t)
   noyau_tampon = noyau_tampon + t
@@ -449,6 +459,8 @@ procedure NOYAU_LIGNE(l)
       finsi
     cas commencepar(m, "fin:")
       NOYAU_FIN_CELLULE(souschaine(m, 5))
+    cas commencepar(m, "demande:")
+      noyau_requete = vrai
     fincas
     retourner
   finsi
@@ -512,6 +524,16 @@ procedure NOYAU_FIN_CELLULE(r)
 retourner
 
 procedure NOYAU_DEMANDE(invite)
+  si noyau_requete
+    && executer_cellule / executer_depuis hors du planificateur : sans effet
+    noyau_requete = faux
+    STATUT("executer_cellule() et executer_depuis() n'agissent que dans le planificateur")
+    essayer
+      noyau_x:envoyer("§refus")
+    capturer e
+    finessayer
+    retourner
+  finsi
   si pret_annonce
     pret_annonce = faux
     noyau_pret = vrai
@@ -582,7 +604,9 @@ procedure NOYAU_FIN(ev)
   NOYAU_DEMARRER()
 retourner
 
-&& ---------------------------------------------------------------- erreurs d'exécution
+&&
+&& erreurs d'exécution
+&&
 
 && {fichier, n, debut, fin} de la première référence « nom.prg:n » à partir de depart
 fonction REF_SUIVANTE(l, depart)
@@ -634,7 +658,7 @@ fonction LIBELLE_LIEU(id, ligne, idcourant)
   si id = idcourant
     retourner "ligne " + ligne
   finsi
-retourner "cellule [" + INDEX_CELLULE(id) + "], ligne " + ligne
+retourner "cellule [" + NUMERO(id) + "], ligne " + ligne
 
 && pile d'appels du noyau -> références aux cellules du carnet
 fonction TRADUIRE_PILE(trace, idcourant)

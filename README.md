@@ -83,6 +83,47 @@ l'autre, ◉ : cellule masquée et ✓ : cellule exportée) donne le plan du car
 Avec un runtime qui n'a pas `panneau:volet` (voir les modifications du runtime livrées avec cette
 version), la minimap se place à droite de l'ascenseur et le glisser n'est montré qu'au relâchement.
 
+### Planificateur
+
+La première cellule du carnet, notée **[*]** avec l'icône ⏱, est le planificateur : du code
+Lexis+ lancé en tâche de fond, sur un noyau qui lui est réservé (ses variables sont à part de
+celles du noyau principal), à la période choisie dans la liste de son bandeau : **+10s, +30s,
++1min, +5min, +10min, +30min, +1h**. Elle reste en tête : elle ne se déplace pas, ne se duplique
+pas et ne se supprime pas. Un nouveau carnet, ou un carnet ouvert qui n'en a pas, en reçoit une,
+masquée, case décochée (inactive).
+
+- **Actif** seulement quand la cellule est **masquée** et sa **case cochée** ; le code est alors
+  lancé tout de suite, puis, à la fin de chaque exécution, la période est ajoutée à l'heure
+  courante : c'est le prochain lancement, affiché dans le bandeau (« prochain lancement :
+  14:32:10 »). Changer la période recalcule le prochain lancement depuis la dernière fin.
+- Démasquer la cellule ou décocher sa case **arrête** le planificateur : la tâche en cours est
+  interrompue (son noyau est arrêté) et la cellule qu'elle exécutait retrouve le résultat
+  qu'elle avait avant son lancement.
+- ▶ (ou Ctrl+Entrée) dans le planificateur actif le lance sans attendre ; *Tout exécuter* et
+  les exports l'ignorent. En exécution en lot (ligne de commande), il ne tourne pas.
+
+Dans le code du planificateur :
+
+| Appel | Effet |
+| --- | --- |
+| `executer_cellule(n)` | exécute la cellule `[n]` ; renvoie `vrai`, `faux` (erreur, visible dans ses sorties) ou `nul` (sans effet) |
+| `executer_depuis(n)` | exécute les cellules de `[n]` à la fin, dans l'ordre, jusqu'à la première erreur ; renvoie le nombre exécuté |
+
+Seules les cellules de **code Lexis+ et SQL masquées** sont exécutées ; une cellule affichée,
+de texte, le planificateur lui-même ou une cellule déjà en cours (dans le noyau principal ou le
+planificateur) est ignorée : l'appel est sans effet (une ligne le signale dans les sorties du
+planificateur). Leurs résultats s'affichent dans leurs propres sorties. Hors du planificateur,
+ces deux appels sont sans effet. `saisir()` n'ouvre pas de boîte de saisie en tâche de fond
+(réponse vide). Les exécutions du planificateur ne marquent pas le carnet comme modifié.
+
+```
+&& toutes les 5 minutes : recharger les données puis recalculer la suite du carnet
+? "mise à jour", heure()
+si executer_cellule(2) = vrai
+  executer_depuis(3)
+finsi
+```
+
 ## Écrire du code
 
 Les variables **non déclarées** sont globales : elles restent d'une cellule à l'autre jusqu'au
@@ -151,7 +192,8 @@ JSON UTF-8, lisible et versionnable :
     {"genre": "markdown", "source": "# Titre"},
     {"genre": "code", "source": "? 1 + 1", "compteur": 1, "duree": 0.001,
      "sorties": [{"genre": "texte", "texte": "2"}]},
-    {"genre": "code", "source": "x = 1", "masquee": true, "export": false}
+    {"genre": "code", "source": "x = 1", "masquee": true, "export": false},
+    {"genre": "planif", "source": "executer_depuis(2)", "masquee": true, "intervalle": "+5min"}
   ]
 }
 ```
@@ -160,6 +202,8 @@ Sorties : `texte`, `valeur`, `markdown` (`texte`), `table` (`colonnes`, `lignes`
 `graphe` (`forme`, `titre`, `categories`, `series` : `{nom, valeurs}`), `erreur` (`texte`, `ligne`).
 Une `source` peut aussi être une liste de lignes. `masquee` (cellule repliée) et `export`
 (`false` : exclue des exports) sont facultatifs et ne sont écrits que s'ils diffèrent du défaut.
+La cellule `planif` (planificateur, toujours la première) a une `intervalle` ; son `export`
+est sa case d'activation (absent : cochée).
 
 ## Réglages
 
@@ -177,6 +221,7 @@ Une `source` peut aussi être une liste de lignes. `masquee` (cellule repliée) 
 | `moteur.prg` | noyau : interpréteur séparé, file d'attente, protocole, erreurs |
 | `export.prg` | exports HTML, Markdown, PDF, `.prg` ; graphes en SVG |
 | `minicarte.prg` | minimap : vignettes des cellules, aller à une cellule, réordonner par glisser |
+| `planificateur.prg` | planificateur [*] : noyau dédié, période, `executer_cellule` / `executer_depuis` |
 | `ressources/noyau.lxk` | programme du noyau et aides `afficher…` |
 | `exemples/*.lxnb` | carnet de découverte et aide-mémoire (déjà exécutés) |
 

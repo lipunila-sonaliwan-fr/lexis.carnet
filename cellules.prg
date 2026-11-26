@@ -8,6 +8,8 @@
 
 fonction LIBELLE_GENRE(g)
   faire cas
+  cas g = "planif"
+    retourner "⏱ Planif."
   cas g = "markdown"
     retourner "Texte"
   cas g = "sql"
@@ -49,6 +51,8 @@ procedure CONSTRUIRE_TOUT
   suivant
   maj_ui = faux
   MINI_RAFRAICHIR()
+  planif_info_vu = ""
+  PLANIF_VERIFIER()
 retourner
 
 procedure CONSTRUIRE_CELLULE(c)
@@ -68,22 +72,41 @@ procedure CONSTRUIRE_CELLULE(c)
   u.num.largeurfixe = 54
   u.num.couleur = "#60A5FA"
   u.genre_lbl = u.entete:ajouter(ui.etiquette(LIBELLE_GENRE(c.genre)))
-  u.genre_lbl.largeurfixe = 64
-  u.genre_lbl.couleur = "#9CA3AF"
+  u.genre_lbl.largeurfixe = sisinon(c.genre = "planif", 76, 64)
+  u.genre_lbl.couleur = sisinon(c.genre = "planif", "#C4B5FD", "#9CA3AF")
+  si c.genre = "planif"
+    && planificateur : période (liste déroulante) ; la case active le planificateur
+    u.periode = u.entete:ajouter(ui.combo(PLANIF_PERIODES))
+    u.periode.largeurfixe = 104
+    u.periode.infobulle = "Période : durée ajoutée à l'heure de fin d'exécution pour le lancement suivant"
+    essayer
+      u.periode:selectionner(PLANIF_INDEX_PERIODE(c.intervalle))
+    capturer e
+    finessayer
+    u.periode.surselection = @PLANIF_PERIODE
+  finsi
   u.info = u.entete:ajouter(ui.etiquette(""))
   u.info.poids = 1
   u.info.couleur = "#9CA3AF"
   u.exp = u.entete:ajouter(ui.cases("§"))
-  u.exp.largeurfixe = 36
-  u.exp.infobulle = "Inclure la cellule dans les exports (HTML, Markdown, PDF, .prg)"
+  u.exp.largeurfixe = 40
+  u.exp.infobulle = sisinon(c.genre = "planif", ;
+    "Activer le planificateur (il ne tourne que si sa cellule est aussi masquée)", ;
+    "Inclure la cellule dans les exports (HTML, Markdown, PDF, .prg)")
   u.exp:cocher(1, c.exporter <> faux)
   u.exp.surchangement = @EXPORT_CHANGE
-  BOUTON_CELLULE(u, "▶", "executer", "Exécuter la cellule (Ctrl+Entrée)")
-  BOUTON_CELLULE(u, "▲", "monter", "Monter")
-  BOUTON_CELLULE(u, "▼", "descendre", "Descendre")
-  BOUTON_CELLULE(u, "⧉", "dupliquer", "Dupliquer")
-  BOUTON_CELLULE(u, "+", "ajouter", "Insérer une cellule de code dessous")
-  BOUTON_CELLULE(u, "✕", "supprimer", "Supprimer la cellule")
+  si c.genre = "planif"
+    && non déplaçable, non dupliqué, non supprimé
+    BOUTON_CELLULE(u, "▶", "executer", "Lancer le planificateur maintenant (s'il est actif)")
+    BOUTON_CELLULE(u, "+", "ajouter", "Insérer une cellule de code dessous")
+  sinon
+    BOUTON_CELLULE(u, "▶", "executer", "Exécuter la cellule (Ctrl+Entrée)")
+    BOUTON_CELLULE(u, "▲", "monter", "Monter")
+    BOUTON_CELLULE(u, "▼", "descendre", "Descendre")
+    BOUTON_CELLULE(u, "⧉", "dupliquer", "Dupliquer")
+    BOUTON_CELLULE(u, "+", "ajouter", "Insérer une cellule de code dessous")
+    BOUTON_CELLULE(u, "✕", "supprimer", "Supprimer la cellule")
+  finsi
   u.ed = u.bloc:ajouter(ui.editeur{onglets = faux, minicarte = faux, numeros = "simples", ;
                                    ajuster = vrai, lignesmin = 2, taille = reglages.police})
   u.ed:nouveau("cellule")
@@ -153,7 +176,10 @@ procedure MAJ_ENTETE(c)
   && change pas quand on exécute, seulement si l'on ajoute, supprime ou déplace des cellules
   locale n = NUMERO_CELLULE(c.id)
   locale info = ""
-  si c.genre <> "markdown"
+  si c.genre = "planif"
+    info = PLANIF_INFO(c)
+    planif_info_vu = info
+  sinonsi c.genre <> "markdown"
     faire cas
     cas c.etat = "attente"
       info = "en attente"
@@ -167,7 +193,7 @@ procedure MAJ_ENTETE(c)
   sinonsi u.edition
     info = "Maj+Entrée : afficher le rendu"
   finsi
-  si c.masquee
+  si c.masquee et c.genre <> "planif"
     info = sisinon(info = "", "", info + " · ") + APERCU_CELLULE(c, 70)
   finsi
   u.num.libelle = n
@@ -177,17 +203,22 @@ procedure MAJ_ENTETE(c)
 retourner
 
 fonction NUMERO_CELLULE(id)
-retourner "[" + INDEX_CELLULE(id) + "]"
+retourner "[" + NUMERO(id) + "]"
 
 && renumérote les bandeaux (après un ajout, une suppression ou un déplacement)
 procedure NUMEROTER
   si carnet = nul
     retourner
   finsi
+  locale k = 0
   pour i = 1 a taille(carnet.cellules)
-    locale u = UIC[carnet.cellules[i].id]
+    locale cc = carnet.cellules[i]
+    si cc.genre <> "planif"
+      k += 1
+    finsi
+    locale u = UIC[cc.id]
     si u <> nul
-      locale n = "[" + i + "]"
+      locale n = sisinon(cc.genre = "planif", "[*]", "[" + k + "]")
       si u.num.libelle <> n
         u.num.libelle = n
       finsi
@@ -363,6 +394,9 @@ procedure BASCULER_MASQUE(id)
   CHANGER_AFFICHAGE(c)
   MAJ_ENTETE(c)
   MARQUER_MODIFIE()
+  si c.genre = "planif"
+    PLANIF_VERIFIER()
+  finsi
   && pas de focus sur l'éditeur déplié : le panneau défilerait pour le montrer en entier
   && et le bandeau cliqué quitterait la position du pointeur
 retourner
@@ -422,7 +456,11 @@ procedure EXPORT_CHANGE(ev)
           CHANGER_AFFICHAGE(c)
         finsi
         MARQUER_MODIFIE()
-        STATUT(sisinon(c.exporter, "Cellule incluse dans les exports", "Cellule exclue des exports"))
+        si c.genre = "planif"
+          PLANIF_VERIFIER()
+        sinon
+          STATUT(sisinon(c.exporter, "Cellule incluse dans les exports", "Cellule exclue des exports"))
+        finsi
       finsi
       retourner
     finsi
@@ -444,7 +482,11 @@ procedure BASCULER_EXPORT(id)
     CHANGER_AFFICHAGE(c)
   finsi
   MARQUER_MODIFIE()
-  STATUT(sisinon(c.exporter, "Cellule incluse dans les exports", "Cellule exclue des exports"))
+  si c.genre = "planif"
+    PLANIF_VERIFIER()
+  sinon
+    STATUT(sisinon(c.exporter, "Cellule incluse dans les exports", "Cellule exclue des exports"))
+  finsi
 retourner
 
 &&
@@ -485,6 +527,9 @@ procedure INSERER_CELLULE(genre, src, decalage)
   si i > 0
     pos = i + decalage
   finsi
+  si PLANIF_CELLULE() <> nul et pos < 2
+    pos = 2                     && rien avant le planificateur
+  finsi
   si pos > n
     inserer nc dans carnet.cellules
     CONSTRUIRE_CELLULE(nc)
@@ -519,7 +564,8 @@ retourner
 procedure DEPLACER(id, sens)
   locale i = INDEX_CELLULE(id)
   locale j = i + sens
-  si i = 0 ou j < 1 ou j > taille(carnet.cellules)
+  locale premiere = sisinon(PLANIF_CELLULE() <> nul, 2, 1)     && le planificateur reste en tête
+  si i < premiere ou j < premiere ou j > taille(carnet.cellules)
     retourner
   finsi
   SYNC_SOURCES()
@@ -549,7 +595,7 @@ retourner
 
 procedure DUPLIQUER(id)
   locale c = CELLULE(id)
-  si c = nul
+  si c = nul ou c.genre = "planif"
     retourner
   finsi
   SYNC_SOURCES()
@@ -570,8 +616,12 @@ procedure SUPPRIMER_CELLULE(id)
   si i = 0
     retourner
   finsi
-  si id = cellule_en_cours
+  si id = cellule_en_cours ou PLANIF_TIENT(id)
     STATUT("Cellule en cours d'exécution : interrompez-la d'abord.")
+    retourner
+  finsi
+  si carnet.cellules[i].genre = "planif"
+    STATUT("Le planificateur ne se supprime pas (décochez sa case pour l'arrêter)")
     retourner
   finsi
   SYNC_SOURCES()
@@ -593,7 +643,7 @@ procedure SUPPRIMER_CELLULE(id)
   suivant
   BOUTONS = reste
   cellule_choisie = 0
-  si taille(carnet.cellules) = 0
+  si taille(carnet.cellules) = 0 ou (taille(carnet.cellules) = 1 et carnet.cellules[1].genre = "planif")
     locale nc = NOUVELLE_CELLULE("code", "")
     inserer nc dans carnet.cellules
     CONSTRUIRE_CELLULE(nc)
@@ -606,7 +656,7 @@ retourner
 procedure CHANGER_GENRE(id, genre)
   locale c = CELLULE(id)
   locale u = UIC[id]
-  si c = nul ou u = nul ou c.genre = genre
+  si c = nul ou u = nul ou c.genre = genre ou c.genre = "planif" ou genre = "planif"
     retourner
   finsi
   SYNC_SOURCES()
@@ -652,7 +702,7 @@ retourner
 procedure EFFACER_SORTIES_CELLULE(id)
   locale c = CELLULE(id)
   locale u = UIC[id]
-  si c = nul ou u = nul ou id = cellule_en_cours
+  si c = nul ou u = nul ou id = cellule_en_cours ou PLANIF_TIENT(id)
     retourner
   finsi
   c.sorties = {}
@@ -689,6 +739,10 @@ procedure EXECUTER_CELLULE(id)
     RENDRE_MARKDOWN(id)
     retourner
   finsi
+  si c.genre = "planif"
+    PLANIF_MAINTENANT()
+    retourner
+  finsi
   c.source = UIC[id].ed.valeur
   NOYAU_SOUMETTRE(id)
 retourner
@@ -721,7 +775,8 @@ procedure EXECUTER_PLAGE(debut, fin)
       si UIC[c.id] <> nul et UIC[c.id].edition et rogner(c.source) <> ""
         RENDRE_MARKDOWN(c.id)
       finsi
-    sinon
+    sinonsi c.genre <> "planif"
+      && (le planificateur ne s'exécute qu'en tâche de fond)
       NOYAU_SOUMETTRE(c.id)
     finsi
   suivant

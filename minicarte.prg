@@ -65,6 +65,8 @@ fonction MINI_FOND(c, visible)
   locale g = c.genre
   si reglages.sombre
     faire cas
+    cas g = "planif"
+      retourner sisinon(visible, "#4C3D7A", "#2E2650")
     cas g = "markdown"
       retourner sisinon(visible, "#5B5330", "#36321F")
     cas g = "sql"
@@ -73,6 +75,8 @@ fonction MINI_FOND(c, visible)
     retourner sisinon(visible, "#33507A", "#1F2F47")
   finsi
   faire cas
+  cas g = "planif"
+    retourner sisinon(visible, "#DDD6FE", "#EDE9FE")
   cas g = "markdown"
     retourner sisinon(visible, "#F5E6B0", "#FBF4DC")
   cas g = "sql"
@@ -86,12 +90,14 @@ retourner sisinon(visible, "#C7D7F2", "#E6EDF9")
 fonction MINI_TEXTE(c, n)
   locale g = "Lexis+"
   faire cas
+  cas c.genre = "planif"
+    retourner "* ⏱ Planif."
   cas c.genre = "markdown"
     g = "Texte"
   cas c.genre = "sql"
     g = "SQL"
   fincas
-retourner chaine(n) + " " + g
+retourner chaine(NUMERO(c.id)) + " " + g
 
 && signature de la structure (thème, ordre et genre des cellules) : si elle change, les
 && vignettes sont reconstruites et les bandeaux renumérotés ; masquer une cellule ou changer
@@ -146,7 +152,7 @@ procedure MINI_RECONSTRUIRE
     v.lx = v.ligne:ajouter(ui.etiquette(""))
     v.lx.largeurfixe = 20
     v.lx.couleur = "#9CA3AF"
-    v.lbl.infobulle = "n° " + i + " · " + LIBELLE_GENRE(c.genre) + " : " + APERCU_CELLULE(c, 60) + ;
+    v.lbl.infobulle = "[" + NUMERO(c.id) + "] · " + LIBELLE_GENRE(c.genre) + " : " + APERCU_CELLULE(c, 60) + ;
                       "  —  clic : y aller ; glisser : la déplacer"
     v.cadre.surboutonbas = @MINI_BAS
     v.cadre.surdeplacement = @MINI_DEPLACE
@@ -320,7 +326,8 @@ retourner 0
 
 && position d'insertion (1 .. n+1) pour une ordonnée de la souris
 fonction MINI_POSITION(y)
-  pour i = 1 a taille(VIGNETTES)
+  locale premiere = sisinon(PLANIF_CELLULE() <> nul, 2, 1)       && rien avant le planificateur
+  pour i = premiere a taille(VIGNETTES)
     locale cadre = VIGNETTES[i].cadre
     essayer
       si y < cadre.y + cadre.hauteur / 2
@@ -336,7 +343,10 @@ procedure MINI_BAS(ev)
   si i = 0 ou ev.bouton <> "gauche"
     retourner
   finsi
-  mini_glisse = {id = VIGNETTES[i].id, y0 = ev.y, deplace = faux, cible = 0}
+  locale c = CELLULE(VIGNETTES[i].id)
+  && le planificateur ne se déplace pas : sa vignette sert seulement à y aller
+  mini_glisse = {id = VIGNETTES[i].id, y0 = ev.y, deplace = faux, cible = 0, ;
+                 fixe = (c <> nul et c.genre = "planif")}
   essayer
     fen.suivisouris = vrai
   capturer e
@@ -347,6 +357,9 @@ procedure MINI_DEPLACE(ev)
   si mini_glisse = nul
     retourner
   finsi
+  si mini_glisse.fixe
+    retourner
+  finsi
   si non mini_glisse.deplace et abs(ev.y - mini_glisse.y0) < 6
     retourner
   finsi
@@ -355,12 +368,13 @@ procedure MINI_DEPLACE(ev)
   si p <> mini_glisse.cible
     mini_glisse.cible = p
     locale i = INDEX_CELLULE(mini_glisse.id)
+    locale nom = "la cellule [" + NUMERO(mini_glisse.id) + "]"
     si p = i ou p = i + 1
-      STATUT("Relâcher ici : la cellule n° " + i + " ne bouge pas")
+      STATUT("Relâcher ici : " + nom + " ne bouge pas")
     sinonsi p > taille(VIGNETTES)
-      STATUT("Relâcher ici : la cellule n° " + i + " passe à la fin")
+      STATUT("Relâcher ici : " + nom + " passe à la fin")
     sinon
-      STATUT("Relâcher ici : la cellule n° " + i + " passe avant la n° " + p)
+      STATUT("Relâcher ici : " + nom + " passe avant la cellule [" + NUMERO(VIGNETTES[p].id) + "]")
     finsi
     MINI_RAFRAICHIR()
   finsi
@@ -377,7 +391,7 @@ procedure MINI_HAUT(ev)
   locale g = mini_glisse
   mini_glisse = nul
   && sans suivi de la souris (ancien runtime), le glisser se décide au relâchement
-  si non g.deplace et abs(ev.y - g.y0) >= 6
+  si non g.deplace et abs(ev.y - g.y0) >= 6 et non g.fixe
     g.deplace = vrai
   finsi
   si non g.deplace
@@ -412,7 +426,7 @@ procedure MINI_DEPLACER(id, p)
   finsi
   REORDONNER_CELLULES(min(i, p))
   MARQUER_MODIFIE()
-  STATUT("Cellule déplacée en position " + p)
+  STATUT("Cellule déplacée : c'est maintenant la cellule [" + NUMERO(id) + "]")
   mini_a_montrer = id
   MINI_RAFRAICHIR()
 retourner

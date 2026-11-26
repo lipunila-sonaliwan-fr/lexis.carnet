@@ -31,7 +31,9 @@ fonction CHOISIR_EXPORT(ext, filtre)
   finsi
 retourner p
 
-&& ---------------------------------------------------------------- graphes SVG
+&&
+&& graphes SVG
+&&
 
 fonction SVG_GRAPHE(s, larg, haut)
   locale forme = FORME_GRAPHE(s.forme)
@@ -249,7 +251,9 @@ procedure SVG_SECTEURS(o, series, cats, cx, cy, r, pal)
   suivant
 retourner
 
-&& ---------------------------------------------------------------- HTML
+&&
+&& HTML
+&&
 
 fonction CSS_EXPORT()
 retourner [[
@@ -358,7 +362,7 @@ fonction HTML_CARNET()
     si c.genre = "markdown"
       inserer "<section class=" + car(34) + "md" + car(34) + ">" + publication.html(c.source) + "</section>" dans o
     sinon
-      locale n = "[" + INDEX_CELLULE(c.id) + "]"
+      locale n = "[" + NUMERO(c.id) + "]"
       si c.genre = "sql"
         n = "SQL " + n
       finsi
@@ -428,7 +432,9 @@ fonction EXPORTER_VERS(p)
   finessayer
 retourner vrai
 
-&& ---------------------------------------------------------------- Markdown et PDF
+&&
+&& Markdown et PDF
+&&
 
 fonction CELLULE_MD(t)
 retourner remplacertexte(remplacertexte(chaine(sisinon(t = nul, "", t)), "|", "\\|"), car(10), " ")
@@ -528,7 +534,9 @@ procedure EXPORT_PDF(p)
   fichier.supprimer(tmp)
 retourner
 
-&& ---------------------------------------------------------------- programme .prg
+&&
+&& programme .prg
+&&
 
 && sépare le code d'une cellule : {corps = lignes, defs = lignes des procédures}
 fonction SEPARER_CODE(src)
@@ -603,6 +611,13 @@ retourner
 procedure AFFICHER_SQL(s)
   AFFICHER_TABLE(requete(s))
 retourner
+
+&& planificateur du carnet : sans effet hors du carnet
+fonction EXECUTER_CELLULE(n)
+retourner nul
+
+fonction EXECUTER_DEPUIS(n)
+retourner 0
 ]]
 
 procedure EXPORTER_PRG
@@ -619,6 +634,9 @@ fonction PROGRAMME_CARNET()
   inserer "" dans corps
   locale k = 0
   pour chaque c dans carnet.cellules
+    si c.genre = "planif"
+      boucler                   && le planificateur n'est jamais exporté
+    finsi
     k += 1
     si c.exporter = faux
       inserer "&& ---- cellule " + k + " : exclue de l'export" dans corps

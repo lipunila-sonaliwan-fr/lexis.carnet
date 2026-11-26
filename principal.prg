@@ -14,10 +14,11 @@
 &&   moteur.prg      noyau d'exécution : interpréteur séparé, file d'attente, protocole
 &&   export.prg      exports HTML, Markdown, PDF et programme .prg ; graphes en SVG
 &&   minicarte.prg   minimap : vignettes numérotées des cellules (aller, réordonner)
+&&   planificateur.prg  cellule [*] : code lancé en tâche de fond, à intervalle, sur un noyau dédié
 &&   ressources/noyau.lxk  programme du noyau (copié dans un dossier temporaire)
 ui = paquet("interface")
 
-APP_NOM = "Carnet Lexis+ 1.0.4"
+APP_NOM = "Carnet Lexis+ 1.0.5"
 reglages = LIRE_REGLAGES()
 carnet = nul                && document courant {titre, cellules, ...}
 chemin_carnet = ""          && fichier .lxnb ("" : jamais enregistré)
@@ -44,11 +45,32 @@ mini_cle = ""               && dernier état vu par la minuterie (défilement, c
 mini_tics = 0
 focus_differe = 0           && cellule à qui donner le focus après la mise en page
 num_ordre = ""              && ordre des cellules au dernier numérotage des bandeaux
+&& planificateur (planificateur.prg)
+PLANIF_PERIODES = {"+10s", "+30s", "+1min", "+5min", "+10min", "+30min", "+1h"}
+PLANIF_SECONDES = {10, 30, 60, 300, 600, 1800, 3600}
+planif_x = nul              && noyau dédié du planificateur
+planif_id = 0               && id de la cellule du planificateur suivie
+planif_actif = faux
+planif_pret = faux
+planif_annonce = faux
+planif_requete = ""         && demande du noyau en attente de réponse (cellule:n, liste:n)
+planif_tampon = ""
+planif_texte = {}
+planif_texte_id = 0
+planif_dossier_envoye = faux
+planif_pile = {}            && cellules en cours : {id, ident, avant (sorties), duree, compteur}
+planif_seq = 0
+planif_prochaine = 0        && horodatage du prochain lancement
+planif_prochaine_txt = ""
+planif_derniere_fin = 0
+planif_info_vu = ""
+planif_minuterie = nul
 && noyau
 noyau_x = nul
 noyau_dossier = ""
 noyau_pret = faux
 pret_annonce = faux
+noyau_requete = faux        && le noyau attend la réponse à une demande (executer_cellule…)
 noyau_tampon = ""
 noyau_etat = "arrêté"
 file_attente = {}
@@ -135,6 +157,7 @@ pc.ancrage = "centre"
 pc.marge = 12
 pc.espacement = 10
 MINI_CREER()
+PLANIF_CREER()
 
 && ligne de commande : [carnet.lxnb] [--executer] [--enregistrer] [--exporter f.html|.md|.pdf|.prg] [--quitter]
 depart = ""
@@ -210,6 +233,8 @@ procedure MAJ_TITRE
         nt += 1
       cas c.genre = "sql"
         ns += 1
+      cas c.genre = "planif"
+        nc += 0                 && le planificateur n'est pas compté
       autrement
         nc += 1
       fincas
@@ -408,11 +433,13 @@ procedure NOUVEAU_CARNET
   inserer NOUVELLE_CELLULE("markdown", "# Nouveau carnet" + car(10) + car(10) + ;
           "Double-cliquez sur ce texte pour le modifier ; **Maj+Entrée** exécute une cellule.") dans carnet.cellules
   inserer NOUVELLE_CELLULE("code", "") dans carnet.cellules
+  ASSURER_PLANIF(carnet)
   chemin_carnet = ""
   modifie = faux
   CONSTRUIRE_TOUT()
-  CHOISIR(carnet.cellules[2].id)
-  FOCUS_CELLULE(carnet.cellules[2].id)
+  locale derniere = carnet.cellules[taille(carnet.cellules)].id
+  CHOISIR(derniere)
+  FOCUS_CELLULE(derniere)
   MAJ_TITRE()
   STATUT("Nouveau carnet")
 retourner
@@ -460,7 +487,9 @@ procedure OUVRIR_CHEMIN(p)
   ECRIRE_REGLAGES()
   NOYAU_DOSSIER_COURANT()
   CONSTRUIRE_TOUT()
-  si taille(carnet.cellules) > 0
+  si taille(carnet.cellules) > 1
+    CHOISIR(carnet.cellules[2].id)        && la première cellule après le planificateur
+  sinonsi taille(carnet.cellules) > 0
     CHOISIR(carnet.cellules[1].id)
   finsi
   MAJ_TITRE()
